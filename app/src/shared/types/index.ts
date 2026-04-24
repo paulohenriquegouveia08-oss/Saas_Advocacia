@@ -47,6 +47,7 @@ export interface User {
   updatedAt: string;
   roleId: string | null;
   organizationId: string | null;
+  clientId?: string | null;
   // Joins
   role?: Role;
   organization?: Organization;
@@ -79,6 +80,9 @@ export interface FinancialTransaction {
   clientId: string | null;
   organizationId: string;
   createdById: string;
+  beneficiary: string | null;
+  paymentMethod: string | null;
+  notes: string | null;
   // Joins
   client?: Client;
   createdBy?: User;
@@ -141,4 +145,5 @@ export interface AuthState {
   session: import('@supabase/supabase-js').Session | null;
   loading: boolean;
   isAdmin: boolean;
+  isClient: boolean;
 }

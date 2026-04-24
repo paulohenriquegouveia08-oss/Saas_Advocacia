@@ -17,6 +17,8 @@ import PrazosPage from '@/features/prazos/PrazosPage';
 import UsersPage from '@/features/adminGlobal/UsersPage';
 import RolesPage from '@/features/adminGlobal/RolesPage';
 
+import ClientDashboardPage from '@/features/clientPortal/ClientDashboardPage';
+
 export const router = createBrowserRouter([
   // ---- Public Routes ----
   {
@@ -33,6 +35,16 @@ export const router = createBrowserRouter([
       <PublicRoute>
         <ForgotPasswordPage />
       </PublicRoute>
+    ),
+  },
+
+  // ---- Client Portal Routes ----
+  {
+    path: '/client-dashboard',
+    element: (
+      <ProtectedRoute allowClient>
+        <ClientDashboardPage />
+      </ProtectedRoute>
     ),
   },
 

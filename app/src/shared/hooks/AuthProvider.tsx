@@ -15,6 +15,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const isAdmin = user?.role?.isAdmin ?? false;
+  const isClient = !!user?.clientId;
 
   const loadProfile = useCallback(async (userId: string) => {
     const result = await authService.getProfile(userId);
@@ -152,7 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, session, loading, isAdmin, signIn, signOut, refreshProfile }}
+      value={{ user, session, loading, isAdmin, isClient, signIn, signOut, refreshProfile }}
     >
       {children}
     </AuthContext.Provider>

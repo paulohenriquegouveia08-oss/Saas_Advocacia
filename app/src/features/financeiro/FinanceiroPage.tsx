@@ -1,5 +1,5 @@
 // ============================================
-// Juris Gestão — Financeiro Page
+// Juris Gestão — Financeiro Page (Redesenhado)
 // ============================================
 
 import { useEffect, useState, type FormEvent } from 'react';
@@ -19,6 +19,9 @@ import {
   Edit3,
   Trash2,
   CircleDollarSign,
+  ArrowDownLeft,
+  ArrowUpRight,
+  ArrowLeft,
 } from 'lucide-react';
 import './financeiro.css';
 
@@ -35,6 +38,10 @@ const STATUS_BADGE: Record<string, string> = {
   OVERDUE: 'badge-danger',
   CANCELLED: 'badge-neutral',
 };
+
+const INCOME_CATEGORIES = ['Honorários', 'Consulta', 'Acordo', 'Outros'];
+const EXPENSE_CATEGORIES = ['Aluguel', 'Internet', 'Energia', 'Software/Assinaturas', 'Marketing', 'Custas judiciais', 'Outros'];
+const PAYMENT_METHODS = ['Pix', 'Transferência', 'Dinheiro', 'Cartão'];
 
 export default function FinanceiroPage() {
   const { user } = useAuth();
@@ -186,7 +193,7 @@ export default function FinanceiroPage() {
                 <tr>
                   <th>Tipo</th>
                   <th>Descrição</th>
-                  <th>Cliente</th>
+                  <th>Cliente / Beneficiário</th>
                   <th>Valor</th>
                   <th>Vencimento</th>
                   <th>Status</th>
@@ -205,7 +212,11 @@ export default function FinanceiroPage() {
                       <span className="client-name">{t.description}</span>
                       {t.category && <span className="tx-category">{t.category}</span>}
                     </td>
-                    <td>{t.client?.fullName ?? '—'}</td>
+                    <td>
+                      {t.type === 'INCOME' 
+                        ? (t.client?.fullName || '—') 
+                        : (t.beneficiary || '—')}
+                    </td>
                     <td className={t.type === 'INCOME' ? 'amount-income' : 'amount-expense'}>
                       {t.type === 'INCOME' ? '+' : '-'} {formatCurrency(Number(t.amount))}
                     </td>
@@ -254,7 +265,9 @@ export default function FinanceiroPage() {
   );
 }
 
-// ---- Transaction Form Modal ----
+// ---- Transaction Form Modal (Redesenhado com 2 etapas) ----
+type ModalStep = 'select-type' | 'form';
+
 function TransacaoFormModal({
   transaction,
   organizationId,
@@ -267,6 +280,7 @@ function TransacaoFormModal({
   onClose: (reload?: boolean) => void;
 }) {
   const isEditing = !!transaction;
+  const [step, setStep] = useState<ModalStep>(isEditing ? 'form' : 'select-type');
   const [saving, setSaving] = useState(false);
   const [clientes, setClientes] = useState<Client[]>([]);
   const [form, setForm] = useState({
@@ -278,6 +292,9 @@ function TransacaoFormModal({
     dueDate: transaction?.dueDate?.split('T')[0] ?? '',
     paidDate: transaction?.paidDate?.split('T')[0] ?? '',
     clientId: transaction?.clientId ?? '',
+    paymentMethod: transaction?.paymentMethod ?? '',
+    beneficiary: transaction?.beneficiary ?? '',
+    notes: transaction?.notes ?? '',
   });
 
   useEffect(() => {
@@ -290,23 +307,50 @@ function TransacaoFormModal({
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
+  const selectType = (type: TransactionType) => {
+    setForm((prev) => ({ ...prev, type, category: '', clientId: '', beneficiary: '' }));
+    setStep('form');
+  };
+
+  const categories = form.type === 'INCOME' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!form.description.trim() || !form.amount || !form.dueDate) {
       toast.error('Preencha os campos obrigatórios');
       return;
     }
+    if (form.type === 'INCOME' && !form.clientId) {
+      toast.error('Selecione um cliente para a entrada');
+      return;
+    }
     setSaving(true);
+
+    // Determinar status automático
+    let finalStatus = form.status;
+    if (form.paidDate) {
+      finalStatus = 'PAID';
+    } else if (form.dueDate) {
+      const due = new Date(form.dueDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (due < today && finalStatus === 'PENDING') {
+        finalStatus = 'OVERDUE';
+      }
+    }
 
     const payload = {
       type: form.type,
-      status: form.status,
+      status: finalStatus,
       amount: parseFloat(form.amount),
       description: form.description.trim(),
       category: form.category.trim() || null,
       dueDate: new Date(form.dueDate).toISOString(),
       paidDate: form.paidDate ? new Date(form.paidDate).toISOString() : null,
       clientId: form.clientId || null,
+      beneficiary: form.beneficiary.trim() || null,
+      paymentMethod: form.paymentMethod || null,
+      notes: form.notes.trim() || null,
       organizationId,
       createdById: userId,
     };
@@ -325,127 +369,236 @@ function TransacaoFormModal({
 
   return (
     <div className="modal-overlay" onClick={() => onClose()}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>{isEditing ? 'Editar Transação' : 'Nova Transação'}</h2>
-          <button className="btn btn-ghost btn-sm" onClick={() => onClose()}>
-            <X size={18} />
-          </button>
-        </div>
+      <div className="modal-content modal-financeiro" onClick={(e) => e.stopPropagation()}>
+        
+        {/* ---- STEP 1: Selecionar Tipo ---- */}
+        {step === 'select-type' && (
+          <>
+            <div className="modal-header">
+              <h2>Nova Transação</h2>
+              <button className="btn btn-ghost btn-sm" onClick={() => onClose()}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className="fin-step-subtitle">Selecione o tipo de transação</p>
+              <div className="fin-type-selector">
+                <button
+                  className="fin-type-card fin-type-income"
+                  onClick={() => selectType('INCOME')}
+                  type="button"
+                >
+                  <div className="fin-type-icon-wrapper fin-type-icon-income">
+                    <ArrowDownLeft size={28} strokeWidth={2.5} />
+                  </div>
+                  <span className="fin-type-label">Entrada</span>
+                  <span className="fin-type-desc">Recebimentos, honorários, acordos</span>
+                </button>
+                <button
+                  className="fin-type-card fin-type-expense"
+                  onClick={() => selectType('EXPENSE')}
+                  type="button"
+                >
+                  <div className="fin-type-icon-wrapper fin-type-icon-expense">
+                    <ArrowUpRight size={28} strokeWidth={2.5} />
+                  </div>
+                  <span className="fin-type-label">Saída</span>
+                  <span className="fin-type-desc">Despesas, aluguel, custas</span>
+                </button>
+              </div>
+            </div>
+          </>
+        )}
 
-        <form className="modal-body" onSubmit={handleSubmit} id="transaction-form">
-          <div className="modal-form-grid">
-            <div className="form-group">
-              <label className="form-label">Tipo *</label>
-              <select
-                className="form-input"
-                value={form.type}
-                onChange={(e) => handleChange('type', e.target.value)}
+        {/* ---- STEP 2: Formulário Dinâmico ---- */}
+        {step === 'form' && (
+          <>
+            <div className="modal-header">
+              <div className="fin-form-header-left">
+                {!isEditing && (
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => setStep('select-type')}
+                    type="button"
+                    title="Voltar"
+                  >
+                    <ArrowLeft size={18} />
+                  </button>
+                )}
+                <div>
+                  <h2>
+                    {isEditing
+                      ? 'Editar Transação'
+                      : form.type === 'INCOME'
+                        ? '💰 Nova Entrada'
+                        : '💸 Nova Saída'}
+                  </h2>
+                </div>
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={() => onClose()}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <form className="modal-body" onSubmit={handleSubmit} id="transaction-form">
+              <div className="modal-form-grid">
+
+                {/* Status */}
+                <div className="form-group">
+                  <label className="form-label">Status</label>
+                  <select
+                    className="form-input"
+                    value={form.status}
+                    onChange={(e) => handleChange('status', e.target.value)}
+                  >
+                    <option value="PENDING">Pendente</option>
+                    <option value="PAID">Pago</option>
+                    <option value="OVERDUE">Atrasado</option>
+                  </select>
+                </div>
+
+                {/* Categoria */}
+                <div className="form-group">
+                  <label className="form-label">Categoria *</label>
+                  <select
+                    className="form-input"
+                    value={form.category}
+                    onChange={(e) => handleChange('category', e.target.value)}
+                    required
+                  >
+                    <option value="">Selecione...</option>
+                    {categories.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Descrição */}
+                <div className="form-group modal-full-width">
+                  <label className="form-label">Descrição *</label>
+                  <input
+                    className="form-input"
+                    value={form.description}
+                    onChange={(e) => handleChange('description', e.target.value)}
+                    placeholder={form.type === 'INCOME' ? 'Ex: Honorários - Processo #123' : 'Ex: Aluguel do escritório - Maio'}
+                    required
+                  />
+                </div>
+
+                {/* Valor */}
+                <div className="form-group">
+                  <label className="form-label">Valor (R$) *</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={form.amount}
+                    onChange={(e) => handleChange('amount', e.target.value)}
+                    placeholder="0,00"
+                    required
+                  />
+                </div>
+
+                {/* Forma de Pagamento */}
+                <div className="form-group">
+                  <label className="form-label">Forma de Pagamento</label>
+                  <select
+                    className="form-input"
+                    value={form.paymentMethod}
+                    onChange={(e) => handleChange('paymentMethod', e.target.value)}
+                  >
+                    <option value="">Selecione...</option>
+                    {PAYMENT_METHODS.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Data de Vencimento */}
+                <div className="form-group">
+                  <label className="form-label">Vencimento *</label>
+                  <input
+                    className="form-input"
+                    type="date"
+                    value={form.dueDate}
+                    onChange={(e) => handleChange('dueDate', e.target.value)}
+                    required
+                  />
+                </div>
+
+                {/* Data de Pagamento */}
+                <div className="form-group">
+                  <label className="form-label">Data de Pagamento</label>
+                  <input
+                    className="form-input"
+                    type="date"
+                    value={form.paidDate}
+                    onChange={(e) => handleChange('paidDate', e.target.value)}
+                  />
+                </div>
+
+                {/* Cliente (somente Entrada) */}
+                {form.type === 'INCOME' && (
+                  <div className="form-group modal-full-width">
+                    <label className="form-label">Cliente *</label>
+                    <select
+                      className="form-input"
+                      value={form.clientId}
+                      onChange={(e) => handleChange('clientId', e.target.value)}
+                      required
+                    >
+                      <option value="">Selecione o cliente...</option>
+                      {clientes.map((c) => (
+                        <option key={c.id} value={c.id}>{c.fullName}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Beneficiário (somente Saída) */}
+                {form.type === 'EXPENSE' && (
+                  <div className="form-group modal-full-width">
+                    <label className="form-label">Beneficiário</label>
+                    <input
+                      className="form-input"
+                      value={form.beneficiary}
+                      onChange={(e) => handleChange('beneficiary', e.target.value)}
+                      placeholder="Quem recebeu o pagamento?"
+                    />
+                  </div>
+                )}
+
+                {/* Observações */}
+                <div className="form-group modal-full-width">
+                  <label className="form-label">Observações</label>
+                  <textarea
+                    className="form-input"
+                    value={form.notes}
+                    onChange={(e) => handleChange('notes', e.target.value)}
+                    placeholder="Informações adicionais (opcional)"
+                    rows={3}
+                    style={{ resize: 'vertical' }}
+                  />
+                </div>
+              </div>
+            </form>
+
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => onClose()}>Cancelar</button>
+              <button
+                className="btn btn-primary"
+                form="transaction-form"
+                type="submit"
+                disabled={saving}
               >
-                <option value="INCOME">Entrada (Receita)</option>
-                <option value="EXPENSE">Saída (Despesa)</option>
-              </select>
+                {saving ? (
+                  <div className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} />
+                ) : isEditing ? 'Salvar' : 'Registrar'}
+              </button>
             </div>
-
-            <div className="form-group">
-              <label className="form-label">Status</label>
-              <select
-                className="form-input"
-                value={form.status}
-                onChange={(e) => handleChange('status', e.target.value)}
-              >
-                <option value="PENDING">Pendente</option>
-                <option value="PAID">Pago</option>
-                <option value="OVERDUE">Vencido</option>
-                <option value="CANCELLED">Cancelado</option>
-              </select>
-            </div>
-
-            <div className="form-group modal-full-width">
-              <label className="form-label">Descrição *</label>
-              <input
-                className="form-input"
-                value={form.description}
-                onChange={(e) => handleChange('description', e.target.value)}
-                placeholder="Ex: Honorários advocatícios - Processo #123"
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Valor (R$) *</label>
-              <input
-                className="form-input"
-                type="number"
-                step="0.01"
-                min="0"
-                value={form.amount}
-                onChange={(e) => handleChange('amount', e.target.value)}
-                placeholder="0,00"
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Categoria</label>
-              <input
-                className="form-input"
-                value={form.category}
-                onChange={(e) => handleChange('category', e.target.value)}
-                placeholder="Ex: Honorários, Aluguel..."
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Vencimento *</label>
-              <input
-                className="form-input"
-                type="date"
-                value={form.dueDate}
-                onChange={(e) => handleChange('dueDate', e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Data de Pagamento</label>
-              <input
-                className="form-input"
-                type="date"
-                value={form.paidDate}
-                onChange={(e) => handleChange('paidDate', e.target.value)}
-              />
-            </div>
-
-            <div className="form-group modal-full-width">
-              <label className="form-label">Cliente Vinculado</label>
-              <select
-                className="form-input"
-                value={form.clientId}
-                onChange={(e) => handleChange('clientId', e.target.value)}
-              >
-                <option value="">Nenhum</option>
-                {clientes.map((c) => (
-                  <option key={c.id} value={c.id}>{c.fullName}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </form>
-
-        <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={() => onClose()}>Cancelar</button>
-          <button
-            className="btn btn-primary"
-            form="transaction-form"
-            type="submit"
-            disabled={saving}
-          >
-            {saving ? (
-              <div className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} />
-            ) : isEditing ? 'Salvar' : 'Registrar'}
-          </button>
-        </div>
+          </>
+        )}
       </div>
     </div>
   );

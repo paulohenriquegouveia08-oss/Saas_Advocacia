@@ -10,6 +10,7 @@ export const prazosService = {
     status?: string;
     priority?: string;
     daysAhead?: number;
+    clientId?: string;
   }): Promise<ApiResponse<Deadline[]>> {
     let query = supabase
       .from('Deadline')
@@ -25,6 +26,7 @@ export const prazosService = {
       query = query.lte('dueDate', futureDate.toISOString());
       query = query.gte('dueDate', new Date().toISOString());
     }
+    if (filters?.clientId) query = query.eq('clientId', filters.clientId);
 
     const { data, error, count } = await query;
     if (error) return { data: null, error: error.message };

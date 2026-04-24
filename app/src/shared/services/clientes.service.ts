@@ -29,14 +29,36 @@ export const clientesService = {
   },
 
   async create(payload: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>): Promise<ApiResponse<Client>> {
-    const { data, error } = await supabase
-      .from('Client')
-      .insert(payload)
-      .select()
-      .single();
+    try {
+      // 1. Cria o cliente primeiro
+      const { data: clientData, error: clientError } = await supabase
+        .from('Client')
+        .insert(payload)
+        .select()
+        .single();
 
-    if (error) return { data: null, error: error.message };
-    return { data: data as Client, error: null };
+      if (clientError) throw new Error(clientError.message);
+      if (!clientData) throw new Error('Erro ao criar cliente');
+
+      // 2. Se tiver email, cria o acesso de usuário via RPC
+      if (payload.email) {
+        const { error: rpcError } = await supabase.rpc('admin_create_client_user', {
+          p_email: payload.email,
+          p_name: payload.fullName,
+          p_org_id: payload.organizationId,
+          p_client_id: clientData.id
+        });
+
+        if (rpcError) {
+          console.error('Erro ao criar usuário de acesso do cliente:', rpcError);
+          // Retornamos o clientData mesmo assim, pois o cliente em si foi criado
+        }
+      }
+
+      return { data: clientData as Client, error: null };
+    } catch (err: unknown) {
+      return { data: null, error: err instanceof Error ? err.message : 'Erro desconhecido' };
+    }
   },
 
   async update(clientId: string, payload: Partial<Client>): Promise<ApiResponse<Client>> {

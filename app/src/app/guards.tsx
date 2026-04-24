@@ -10,6 +10,7 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
   requireAdmin?: boolean;
   requiredPermission?: string;
+  allowClient?: boolean;
 }
 
 /**
@@ -18,7 +19,7 @@ interface ProtectedRouteProps {
  * - Se requireAdmin = true e o user não for admin → redireciona para /dashboard.
  * - Se requiredPermission for definida, valida contra role.permissions.
  */
-export function ProtectedRoute({ children, requireAdmin, requiredPermission }: ProtectedRouteProps) {
+export function ProtectedRoute({ children, requireAdmin, requiredPermission, allowClient }: ProtectedRouteProps) {
   const { user, session, loading } = useAuth();
   console.log('[ProtectedRoute] Rendered. session:', !!session, 'user:', !!user, 'loading:', loading);
 
@@ -39,6 +40,18 @@ export function ProtectedRoute({ children, requireAdmin, requiredPermission }: P
   // Usuário inativo
   if (!user.active) {
     return <Navigate to="/login" replace />;
+  }
+
+  const isClient = !!user.clientId;
+
+  // Se for cliente, só pode acessar rotas com allowClient
+  if (isClient && !allowClient) {
+    return <Navigate to="/client-dashboard" replace />;
+  }
+
+  // Se não for cliente e tentar acessar rota exclusiva de cliente
+  if (!isClient && allowClient) {
+     return <Navigate to="/dashboard" replace />;
   }
 
   // Verificar se é admin
@@ -74,6 +87,9 @@ export function PublicRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (session && user) {
+    if (user.clientId) {
+      return <Navigate to="/client-dashboard" replace />;
+    }
     return <Navigate to="/dashboard" replace />;
   }
 
