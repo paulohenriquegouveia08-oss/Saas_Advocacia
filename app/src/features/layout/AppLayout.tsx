@@ -32,7 +32,8 @@ const navItems: NavItem[] = [
   { to: '/clientes', label: 'Clientes', icon: <Users size={20} />, requiredPermission: 'canAccessClientes' },
   { to: '/financeiro', label: 'Financeiro', icon: <Wallet size={20} />, requiredPermission: 'canAccessFinanceiro' },
   { to: '/prazos', label: 'Prazos', icon: <CalendarClock size={20} />, requiredPermission: 'canAccessPrazos' },
-  { to: '/usuarios', label: 'Usuários', icon: <UserCog size={20} />, requireAdmin: true },
+  { to: '/usuarios', label: 'Usuários', icon: <Users size={20} />, requireAdmin: true },
+  { to: '/cargos', label: 'Cargos', icon: <UserCog size={20} />, requireAdmin: true },
 ];
 
 export default function AppLayout() {
@@ -119,8 +120,8 @@ export default function AppLayout() {
             {!collapsed && (
               <div className="sidebar-user-info">
                 <span className="sidebar-user-name">{user?.name ?? 'Usuário'}</span>
-                <span className="sidebar-user-role">
-                  {user?.role?.name ?? 'Sem cargo'}
+                <span className="sidebar-user-role" style={isAdmin ? { color: 'var(--primary-color)', fontWeight: 600 } : {}}>
+                  {isAdmin ? 'Administrador Global' : (user?.role?.name ?? 'Sem cargo')}
                 </span>
               </div>
             )}

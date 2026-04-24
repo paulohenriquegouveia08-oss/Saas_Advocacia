@@ -33,7 +33,7 @@ interface DashboardStats {
 }
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const orgId = user?.organizationId;
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(!!orgId);
@@ -88,7 +88,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {!orgId && (
+      {!orgId && !isAdmin && (
         <div className="bg-amber-100 border-l-4 border-amber-500 text-amber-700 p-4 mb-6 rounded shadow-sm">
           <p className="font-bold">Organização não vinculada</p>
           <p>

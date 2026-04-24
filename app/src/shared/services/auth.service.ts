@@ -50,18 +50,25 @@ export const authService = {
 
   /** Buscar perfil do usuário na tabela pública */
   async getProfile(userId: string) {
+    // Tenta primeiro usar a nova RPC que contorna problemas de RLS no frontend
+    const { data: rpcData, error: rpcError } = await supabase.rpc('get_my_profile');
+    
+    if (rpcData && !rpcError) {
+      return { data: rpcData, error: null };
+    }
+
+    // Fallback original
     const { data, error } = await supabase
       .from('User')
       .select('*, role:Role(*), organization:Organization(*)')
       .eq('id', userId)
-      .single();
-    
+      .maybeSingle();
+
     if (error) {
-      console.error('getProfile ERROR:', error);
+      console.error('getProfile ERROR:', JSON.stringify(error));
       return { data: null, error: error.message };
     }
     
-    console.log('getProfile SUCCESS:', data);
     return { data, error: null };
   },
 };

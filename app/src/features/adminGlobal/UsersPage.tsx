@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/shared/hooks/useAuth';
 import { usersService } from '@/shared/services/users.service';
+import { rolesService } from '@/shared/services/roles.service';
 import { supabase } from '@/shared/services/supabase';
 import { formatDate } from '@/shared/utils/formatters';
 import type { User, Role } from '@/shared/types';
@@ -29,7 +30,7 @@ export default function UsersPage() {
 
     const [usersRes, rolesRes] = await Promise.all([
       usersService.listByOrganization(orgId),
-      supabase.from('Role').select('*').eq('organizationId', orgId),
+      rolesService.listByOrganization(orgId),
     ]);
 
     if (usersRes.data) setUsers(usersRes.data);
@@ -43,7 +44,7 @@ export default function UsersPage() {
 
     Promise.all([
       usersService.listByOrganization(orgId),
-      supabase.from('Role').select('*').eq('organizationId', orgId),
+      rolesService.listByOrganization(orgId),
     ]).then(([usersRes, rolesRes]) => {
       if (!cancelled) {
         if (usersRes.data) setUsers(usersRes.data);
@@ -55,31 +56,89 @@ export default function UsersPage() {
     return () => { cancelled = true; };
   }, [orgId]);
 
+  const [showModal, setShowModal] = useState(false);
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserRole, setNewUserRole] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+
   const handleToggleActive = async (u: User) => {
     const res = await usersService.toggleActive(u.id, !u.active);
     if (res.error) toast.error('Erro ao alterar status');
+    else loadData();
+  };
+
+  const handleRoleChange = async (userId: string, roleId: string) => {
+    const res = await usersService.updateRole(userId, roleId || null);
+    if (res.error) toast.error('Erro ao alterar cargo');
     else {
-      toast.success(u.active ? 'Usuário desativado' : 'Usuário ativado');
+      toast.success('Cargo atualizado');
       loadData();
     }
   };
 
-  const handleRoleChange = async (userId: string, roleId: string) => {
-    const res = await usersService.updateRole(userId, roleId);
-    if (res.error) toast.error('Erro ao alterar cargo');
-    else {
-      toast.success('Cargo atualizado!');
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserName || !newUserEmail || !newUserRole || !orgId) return;
+
+    setIsCreating(true);
+
+    try {
+      // Importação dinâmica do admin client
+      const { supabaseAdmin } = await import('@/shared/services/supabase');
+      if (!supabaseAdmin) throw new Error('Service Role Key não configurada.');
+
+      // 1. Criar o usuário via API Admin oficial do Supabase (GoTrue)
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email: newUserEmail,
+        password: '123456', // Senha temporária, será trocada no primeiro acesso
+        email_confirm: true,
+        user_metadata: { full_name: newUserName },
+      });
+
+      if (authError) throw new Error(authError.message);
+      if (!authData?.user?.id) throw new Error('Falha ao criar conta de autenticação.');
+
+      // 2. Registrar na tabela pública via RPC segura
+      const { error: regError } = await supabase.rpc('admin_register_user', {
+        p_auth_user_id: authData.user.id,
+        p_email: newUserEmail,
+        p_name: newUserName,
+        p_role_id: newUserRole,
+        p_org_id: orgId,
+      });
+
+      if (regError) throw new Error(regError.message);
+
+      toast.success('Usuário criado com sucesso! Ele já pode acessar o sistema.');
+      setShowModal(false);
+      setNewUserName('');
+      setNewUserEmail('');
+      setNewUserRole('');
       loadData();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro desconhecido';
+      toast.error('Erro ao criar usuário: ' + message);
+    } finally {
+      setIsCreating(false);
     }
   };
 
   return (
     <div className="admin-page animate-fade-in">
-      <div className="page-header">
+      <div className="admin-header">
         <div>
-          <h1 className="page-title">Gerenciar Usuários</h1>
-          <p className="page-subtitle">Controle de acesso e permissões do escritório</p>
+          <div className="admin-title-badge">
+            <ShieldCheck size={18} />
+            Administração Global
+          </div>
+          <h1>Gestão de Usuários</h1>
+          <p className="page-subtitle">Gerencie os acessos, cargos e permissões do sistema.</p>
         </div>
+        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+          <Users size={18} className="mr-2" />
+          Novo Usuário
+        </button>
       </div>
 
       {/* Info Banner */}
@@ -164,6 +223,64 @@ export default function UsersPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {showModal && (
+        <div className="modal-overlay">
+          <div className="modal-content animate-scale">
+            <div className="modal-header">
+              <h3>Adicionar Novo Usuário</h3>
+              <button className="btn-close" onClick={() => setShowModal(false)}>×</button>
+            </div>
+            <form onSubmit={handleCreateUser} className="modal-body">
+              <div className="form-group">
+                <label className="form-label">Nome Completo</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={newUserName}
+                  onChange={(e) => setNewUserName(e.target.value)}
+                  placeholder="Ex: João da Silva"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">E-mail</label>
+                <input
+                  type="email"
+                  className="form-input"
+                  value={newUserEmail}
+                  onChange={(e) => setNewUserEmail(e.target.value)}
+                  placeholder="joao@advocacia.com.br"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Cargo Inicial</label>
+                <select
+                  className="form-input"
+                  value={newUserRole}
+                  onChange={(e) => setNewUserRole(e.target.value)}
+                  required
+                >
+                  <option value="" disabled>Selecione um cargo...</option>
+                  {roles.map(r => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="modal-footer">
+                <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)} disabled={isCreating}>
+                  Cancelar
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={isCreating}>
+                  {isCreating ? 'Criando...' : 'Criar Usuário'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

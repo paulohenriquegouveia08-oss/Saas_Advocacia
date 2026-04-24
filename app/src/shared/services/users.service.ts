@@ -7,16 +7,14 @@ import { supabase } from './supabase';
 import type { ApiResponse, User } from '../types';
 
 export const usersService = {
-  /** Listar todos os usuários da organização */
+  /** Listar todos os usuários da organização via RPC (ignora RLS) */
   async listByOrganization(organizationId: string): Promise<ApiResponse<User[]>> {
-    const { data, error, count } = await supabase
-      .from('User')
-      .select('*, role:Role(*)', { count: 'exact' })
-      .eq('organizationId', organizationId)
-      .order('createdAt', { ascending: false });
+    const { data, error } = await supabase.rpc('admin_list_users', {
+      p_org_id: organizationId
+    });
 
     if (error) return { data: null, error: error.message };
-    return { data: data as User[], error: null, count: count ?? undefined };
+    return { data: (data || []) as User[], error: null };
   },
 
   /** Buscar usuário por ID */

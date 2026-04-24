@@ -15,6 +15,7 @@ import ClientesPage from '@/features/clientes/ClientesPage';
 import FinanceiroPage from '@/features/financeiro/FinanceiroPage';
 import PrazosPage from '@/features/prazos/PrazosPage';
 import UsersPage from '@/features/adminGlobal/UsersPage';
+import RolesPage from '@/features/adminGlobal/RolesPage';
 
 export const router = createBrowserRouter([
   // ---- Public Routes ----
@@ -81,6 +82,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute requireAdmin>
             <UsersPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'cargos',
+        element: (
+          <ProtectedRoute requireAdmin>
+            <RolesPage />
           </ProtectedRoute>
         ),
       },
