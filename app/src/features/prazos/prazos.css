@@ -1,0 +1,151 @@
+/* ============================================
+   Prazos Page — Styling
+   ============================================ */
+
+.prazos-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+/* Prazos Card List */
+.prazos-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.prazo-card {
+  transition: all var(--transition-base);
+  animation: slideUp 300ms ease-out;
+}
+
+.prazo-card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+.prazo-completed {
+  opacity: 0.65;
+}
+.prazo-completed .prazo-title {
+  text-decoration: line-through;
+}
+
+.prazo-overdue {
+  border-left: 3px solid var(--color-danger-500);
+}
+
+/* Card Header */
+.prazo-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.prazo-card-left {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.prazo-urgency-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+
+.prazo-urgency-overdue { background: var(--color-danger-500); box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
+.prazo-urgency-urgent { background: var(--color-danger-500); animation: pulse 1.5s infinite; }
+.prazo-urgency-soon { background: var(--color-warning-500); }
+.prazo-urgency-normal { background: var(--color-success-500); }
+
+.prazo-title {
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  color: var(--color-gray-900);
+}
+
+.prazo-process {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-400);
+  margin-top: 2px;
+}
+
+.prazo-card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+.prazo-complete-btn {
+  color: var(--color-success-500) !important;
+}
+.prazo-complete-btn:hover {
+  background: var(--color-success-50) !important;
+}
+
+/* Description */
+.prazo-description {
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-500);
+  margin-bottom: var(--space-4);
+  line-height: 1.5;
+}
+
+/* Card Footer */
+.prazo-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-gray-100);
+}
+
+.prazo-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.prazo-client-badge {
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-500);
+  font-weight: 500;
+}
+
+.prazo-date-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-400);
+}
+
+.prazo-days {
+  font-weight: 600;
+}
+
+.prazo-days-overdue {
+  color: var(--color-danger-500);
+}
+.prazo-days-urgent {
+  color: var(--color-danger-500);
+}
+.prazo-days-soon {
+  color: var(--color-warning-600);
+}
+.prazo-days-normal {
+  color: var(--color-success-600);
+}

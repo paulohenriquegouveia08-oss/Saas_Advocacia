@@ -1,0 +1,79 @@
+/* ============================================
+   Admin Page — Styling
+   ============================================ */
+
+.admin-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+/* Info Banner */
+.admin-info-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-primary-50);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-primary-100);
+  color: var(--color-primary-700);
+}
+
+.admin-info-banner strong {
+  display: block;
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-1);
+}
+
+.admin-info-banner p {
+  font-size: var(--font-size-xs);
+  color: var(--color-primary-600);
+  line-height: 1.5;
+}
+
+.admin-info-banner code {
+  background: rgba(99, 102, 241, 0.1);
+  padding: 1px 4px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+}
+
+/* User Cell */
+.admin-user-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.admin-user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-700));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: var(--font-size-xs);
+  flex-shrink: 0;
+}
+
+/* Role Select */
+.admin-role-select {
+  width: auto;
+  min-width: 140px;
+  height: 34px;
+  font-size: var(--font-size-xs);
+  padding: var(--space-1) var(--space-2);
+}
+
+/* Toggle Button */
+.admin-toggle-btn {
+  color: var(--color-success-500) !important;
+}
+
+.admin-toggle-off {
+  color: var(--color-gray-400) !important;
+}

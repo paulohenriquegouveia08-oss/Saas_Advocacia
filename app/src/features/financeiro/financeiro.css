@@ -1,0 +1,101 @@
+/* ============================================
+   Financeiro Page — Styling
+   ============================================ */
+
+.financeiro-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+/* Summary */
+.fin-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+}
+
+.fin-summary-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  border: 1px solid var(--color-gray-100);
+  box-shadow: var(--shadow-sm);
+}
+
+.fin-summary-card > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.fin-summary-label {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.fin-summary-value {
+  font-size: var(--font-size-lg);
+  font-weight: 800;
+  color: var(--color-gray-900);
+}
+
+.fin-income { border-left: 3px solid var(--color-success-500); }
+.fin-income svg { color: var(--color-success-500); }
+
+.fin-expense { border-left: 3px solid var(--color-danger-500); }
+.fin-expense svg { color: var(--color-danger-500); }
+
+.fin-positive { border-left: 3px solid var(--color-success-500); }
+.fin-positive svg { color: var(--color-success-500); }
+
+.fin-negative { border-left: 3px solid var(--color-danger-500); }
+.fin-negative svg { color: var(--color-danger-500); }
+
+/* Filters */
+.fin-filters {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-gray-400);
+}
+
+.fin-filter-select {
+  width: auto;
+  min-width: 160px;
+  height: 40px;
+  font-size: var(--font-size-sm);
+}
+
+/* Amount colors */
+.amount-income {
+  color: var(--color-success-600);
+  font-weight: 600;
+}
+
+.amount-expense {
+  color: var(--color-danger-600);
+  font-weight: 600;
+}
+
+/* Transaction Category */
+.tx-category {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-400);
+  margin-top: 2px;
+}
+
+@media (max-width: 768px) {
+  .fin-summary {
+    grid-template-columns: 1fr;
+  }
+  .fin-filters {
+    flex-wrap: wrap;
+  }
+}
