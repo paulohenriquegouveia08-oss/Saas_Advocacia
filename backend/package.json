@@ -1,0 +1,27 @@
+{
+  "name": "saas-advocacia-backend",
+  "version": "1.0.0",
+  "description": "Backend do SaaS Jurídico — Fastify + TypeScript",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "fastify": "^4.28.0",
+    "@fastify/cors": "^9.0.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "pg": "^8.13.0",
+    "zod": "^3.23.0",
+    "node-cron": "^3.0.3",
+    "dotenv": "^16.4.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.0",
+    "@types/node-cron": "^3.0.11",
+    "tsx": "^4.19.0"
+  }
+}
