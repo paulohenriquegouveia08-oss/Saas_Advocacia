@@ -33,8 +33,8 @@ class ApiClient {
     const token = await this.getToken()
 
     const headers: HeadersInit = {
-      'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
       ...options.headers,
     }
 

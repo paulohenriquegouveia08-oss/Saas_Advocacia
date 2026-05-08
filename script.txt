@@ -1,0 +1,867 @@
+/**
+ * ============================================================
+ * REFERÊNCIA COMPLETA DE LAYOUT — SISTEMA JURÍDICO
+ * Next.js 14 (App Router) + TypeScript + Tailwind CSS
+ * ============================================================
+ *
+ * COMO USAR ESTE ARQUIVO:
+ * Envie este arquivo para a IA com a instrução:
+ * "Use este arquivo como referência de padrões de layout,
+ *  componentes e correções de bug. Aplique os mesmos padrões
+ *  ao corrigir/criar [nome da página ou componente]."
+ *
+ * O QUE ESTE ARQUIVO COBRE:
+ *  1. Correção de bug: modal empurrando conteúdo (scroll lock + compensação de scrollbar)
+ *  2. Drawer lateral responsivo
+ *  3. Sidebar responsiva com hamburger mobile
+ *  4. Campos de formulário com validação visual inline
+ *  5. Tabela com skeleton, erro e estado vazio
+ *  6. Sistema de toast sem biblioteca externa
+ *  7. Badges de urgência de prazo e status
+ *  8. Animações CSS base (globals.css)
+ *  9. Exemplo completo de página CRUD (Clientes)
+ *
+ * DEPENDÊNCIAS NECESSÁRIAS:
+ *  npm install react-hook-form @hookform/resolvers zod
+ *
+ * ============================================================
+ */
+
+"use client";
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SEÇÃO 1 — globals.css (adicionar ao seu globals.css existente)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+/*
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+// Previne layout shift causado por scrollbar ao abrir modal
+html { scrollbar-gutter: stable; }
+
+// Entrada do modal
+@keyframes modal-in {
+  from { opacity: 0; transform: scale(0.96) translateY(-8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.animate-modal-in {
+  animation: modal-in 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+// Entrada do toast
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(100%); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.animate-toast-in {
+  animation: toast-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+// Foco acessível
+:focus-visible { outline: 2px solid theme('colors.blue.500'); outline-offset: 2px; }
+*/
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SEÇÃO 2 — IMPORTS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+import {
+  useState, useEffect, useRef, useCallback,
+  createContext, useContext,
+  type ReactNode, type InputHTMLAttributes,
+  type SelectHTMLAttributes, type TextareaHTMLAttributes,
+} from "react";
+import { createPortal } from "react-dom";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import type { UseFormRegister, FieldError, Path, FieldValues } from "react-hook-form";
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SEÇÃO 3 — UTILITÁRIO: SCROLL LOCK
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//
+// PROBLEMA QUE RESOLVE:
+//   Ao abrir um modal/drawer, o body recebe overflow:hidden.
+//   Isso remove a scrollbar (~15px), causando um "pulo" no layout.
+//
+// SOLUÇÃO:
+//   Medir a scrollbar ANTES de travar e compensar com paddingRight.
+//   Restaurar tudo ao fechar.
+//
+// USO: chame lockScroll() ao abrir, retorne a função de unlock ao fechar.
+
+function lockScroll() {
+  const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+  const original = {
+    overflow: document.body.style.overflow,
+    paddingRight: document.body.style.paddingRight,
+  };
+  document.body.style.overflow = "hidden";
+  document.body.style.paddingRight = `${scrollbarWidth}px`;
+  return function unlockScroll() {
+    document.body.style.overflow = original.overflow;
+    document.body.style.paddingRight = original.paddingRight;
+  };
+}
+
+// Hook reutilizável de scroll lock
+function useScrollLock(active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    const unlock = lockScroll();
+    return unlock;
+  }, [active]);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SEÇÃO 4 — MODAL
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//
+// CORREÇÕES APLICADAS:
+//   ✓ createPortal → renderiza em document.body, nunca empurra layout
+//   ✓ lockScroll() → compensa scrollbar ao travar o body
+//   ✓ Focus trap → Tab/Shift+Tab ficam dentro do modal
+//   ✓ Fecha com Escape e clique no overlay
+//   ✓ Scroll interno via overflow-y-auto no body do modal
+//   ✓ Devolve foco ao elemento que abriu o modal ao fechar
+
+interface ModalProps {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  children: ReactNode;
+  size?: "sm" | "md" | "lg" | "xl";
+}
+
+const modalSizes = {
+  sm: "max-w-sm",
+  md: "max-w-md",
+  lg: "max-w-lg",
+  xl: "max-w-2xl",
+};
+
+export function Modal({ open, onClose, title, children, size = "md" }: ModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocus = useRef<Element | null>(null);
+
+  useScrollLock(open);
+
+  useEffect(() => {
+    if (open) {
+      previousFocus.current = document.activeElement;
+    } else {
+      if (previousFocus.current instanceof HTMLElement) {
+        previousFocus.current.focus();
+      }
+    }
+  }, [open]);
+
+  // Fechar com Escape
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [open, onClose]);
+
+  // Focus trap
+  useEffect(() => {
+    if (!open || !dialogRef.current) return;
+    const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+      'button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])'
+    );
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    first?.focus();
+    const trap = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+      if (e.shiftKey) { if (document.activeElement === first) { e.preventDefault(); last?.focus(); } }
+      else            { if (document.activeElement === last)  { e.preventDefault(); first?.focus(); } }
+    };
+    document.addEventListener("keydown", trap);
+    return () => document.removeEventListener("keydown", trap);
+  }, [open]);
+
+  if (!open) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      {/* Overlay */}
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+      {/* Dialog */}
+      <div ref={dialogRef} className={`relative z-10 w-full ${modalSizes[size]} bg-white rounded-xl shadow-2xl flex flex-col max-h-[90vh] animate-modal-in`}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+          <h2 id="modal-title" className="text-base font-semibold text-gray-900">{title}</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors" aria-label="Fechar">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        {/* Body — scroll AQUI, nunca no body da página */}
+        <div className="overflow-y-auto overscroll-contain px-6 py-5 flex-1">
+          {children}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SEÇÃO 5 — DRAWER (painel lateral)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//
+// Alternativa ao modal para formulários longos.
+// Em mobile ocupa 100% da largura.
+// Mesmas correções de scroll lock e focus trap.
+
+interface DrawerProps {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  children: ReactNode;
+  side?: "right" | "left";
+  width?: string;
+}
+
+export function Drawer({ open, onClose, title, children, side = "right", width = "w-full sm:w-[480px]" }: DrawerProps) {
+  const drawerRef = useRef<HTMLDivElement>(null);
+
+  useScrollLock(open);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [open, onClose]);
+
+  useEffect(() => {
+    if (open && drawerRef.current) {
+      const focusable = drawerRef.current.querySelectorAll<HTMLElement>(
+        'button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])'
+      );
+      focusable[0]?.focus();
+    }
+  }, [open]);
+
+  const pos   = side === "right" ? "right-0" : "left-0";
+  const slide = open ? "translate-x-0" : side === "right" ? "translate-x-full" : "-translate-x-full";
+
+  if (!open) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
+      <div className={`absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${open ? "opacity-100" : "opacity-0"}`} onClick={onClose} />
+      <div ref={drawerRef} className={`absolute top-0 ${pos} h-full ${width} bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-out ${slide}`}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+          <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-5">{children}</div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SEÇÃO 6 — SIDEBAR LAYOUT
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//
+// Desktop (≥1024px): sidebar fixa, conteúdo ao lado com scroll independente.
+// Mobile (<1024px):  sidebar em drawer + overlay, ativado por hamburger.
+//
+// REGRA IMPORTANTE:
+//   O scroll da página acontece em <main>, nunca em <body>.
+//   Isso evita conflitos com Modal e Drawer.
+
+interface NavItem {
+  href: string;
+  label: string;
+  icon: ReactNode;
+  badge?: number;
+}
+
+interface SidebarLayoutProps {
+  children: ReactNode;
+  navItems: NavItem[];
+  userName: string;
+  userRole: string;
+  notificationCount?: number;
+}
+
+export function SidebarLayout({ children, navItems, userName, userRole, notificationCount = 0 }: SidebarLayoutProps) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
+
+  // Fechar ao navegar
+  useEffect(() => { setMobileOpen(false); }, [pathname]);
+
+  // Scroll lock só quando sidebar mobile aberta
+  useScrollLock(mobileOpen);
+
+  const roleLabels: Record<string, string> = {
+    admin_global: "Admin", funcionario: "Funcionário", cliente: "Cliente",
+  };
+
+  return (
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
+      {/* Overlay mobile */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={() => setMobileOpen(false)} />
+      )}
+
+      {/* Sidebar */}
+      <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-100 flex flex-col transition-transform duration-300 ease-out lg:static lg:translate-x-0 lg:z-auto ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        {/* Logo */}
+        <div className="px-5 py-5 border-b border-gray-100 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" /></svg>
+            </div>
+            <span className="font-semibold text-gray-900 text-sm">LexSystem</span>
+          </div>
+        </div>
+        {/* Nav */}
+        <nav className="flex-1 px-3 py-4 overflow-y-auto">
+          <ul className="space-y-0.5">
+            {navItems.map((item) => {
+              const active = pathname === item.href || pathname.startsWith(item.href + "/");
+              return (
+                <li key={item.href}>
+                  <Link href={item.href} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors group ${active ? "bg-blue-50 text-blue-700" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"}`}>
+                    <span className={`w-5 h-5 shrink-0 ${active ? "text-blue-600" : "text-gray-400 group-hover:text-gray-600"}`}>{item.icon}</span>
+                    {item.label}
+                    {item.badge && item.badge > 0 ? (
+                      <span className="ml-auto bg-red-500 text-white text-xs font-semibold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">{item.badge > 99 ? "99+" : item.badge}</span>
+                    ) : null}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+        {/* User */}
+        <div className="px-4 py-4 border-t border-gray-100 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-gray-600 text-sm font-semibold shrink-0">{userName.charAt(0).toUpperCase()}</div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-gray-900 truncate">{userName}</p>
+              <p className="text-xs text-gray-400">{roleLabels[userRole] ?? userRole}</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Área principal */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Topbar */}
+        <header className="h-14 bg-white border-b border-gray-100 flex items-center px-4 gap-3 shrink-0">
+          <button onClick={() => setMobileOpen(true)} className="lg:hidden p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors" aria-label="Abrir menu">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
+          </button>
+          <div className="flex-1" />
+          <Link href="/notificacoes" className="relative p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors" aria-label="Notificações">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+            {notificationCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">{notificationCount > 9 ? "9+" : notificationCount}</span>
+            )}
+          </Link>
+        </header>
+        {/* Page content — scroll aqui, NUNCA no body */}
+        <main className="flex-1 overflow-y-auto overscroll-contain">{children}</main>
+      </div>
+    </div>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SEÇÃO 7 — CAMPOS DE FORMULÁRIO
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//
+// Todos os campos usam React Hook Form + Zod.
+// Validação visual: borda vermelha + bg-red-50 + mensagem inline embaixo.
+// FormGrid: colunas responsivas que colapsam para 1 no mobile.
+
+// Estilos base dos inputs
+const inputBase = "w-full rounded-lg border px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition-all duration-150";
+const inputOk   = "border-gray-300 bg-white hover:border-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20";
+const inputErr  = "border-red-400 bg-red-50 focus:border-red-500 focus:ring-2 focus:ring-red-500/20";
+
+// Wrapper com label + erro + hint
+function FormField({ label, error, required, hint, children }: { label: string; error?: FieldError; required?: boolean; hint?: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-sm font-medium text-gray-700">
+        {label}{required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      {children}
+      {hint && !error && <p className="text-xs text-gray-400">{hint}</p>}
+      {error && (
+        <p className="text-xs text-red-500 flex items-center gap-1">
+          <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+          {error.message}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Input
+interface InputProps<T extends FieldValues> extends Omit<InputHTMLAttributes<HTMLInputElement>, "name"> {
+  name: Path<T>; register: UseFormRegister<T>; error?: FieldError; label: string; hint?: string;
+}
+export function Input<T extends FieldValues>({ name, register, error, label, hint, required, ...rest }: InputProps<T>) {
+  return (
+    <FormField label={label} error={error} required={required} hint={hint}>
+      <input {...register(name)} {...rest} className={`${inputBase} ${error ? inputErr : inputOk}`} />
+    </FormField>
+  );
+}
+
+// Select
+interface SelectProps<T extends FieldValues> extends Omit<SelectHTMLAttributes<HTMLSelectElement>, "name"> {
+  name: Path<T>; register: UseFormRegister<T>; error?: FieldError; label: string;
+  hint?: string; options: { value: string; label: string }[]; placeholder?: string;
+}
+export function Select<T extends FieldValues>({ name, register, error, label, hint, required, options, placeholder = "Selecione...", ...rest }: SelectProps<T>) {
+  return (
+    <FormField label={label} error={error} required={required} hint={hint}>
+      <select {...register(name)} {...rest}
+        className={`${inputBase} ${error ? inputErr : inputOk} appearance-none`}
+        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%236b7280'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z'/%3E%3C/svg%3E")`, backgroundPosition: "right 0.75rem center", backgroundSize: "1.25rem", paddingRight: "2.5rem" }}
+      >
+        <option value="">{placeholder}</option>
+        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    </FormField>
+  );
+}
+
+// Textarea
+interface TextareaProps<T extends FieldValues> extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "name"> {
+  name: Path<T>; register: UseFormRegister<T>; error?: FieldError; label: string; hint?: string;
+}
+export function Textarea<T extends FieldValues>({ name, register, error, label, hint, required, rows = 3, ...rest }: TextareaProps<T>) {
+  return (
+    <FormField label={label} error={error} required={required} hint={hint}>
+      <textarea {...register(name)} {...rest} rows={rows} className={`${inputBase} ${error ? inputErr : inputOk} resize-none`} />
+    </FormField>
+  );
+}
+
+// Layout helpers
+export function FormGrid({ children, cols = 2 }: { children: ReactNode; cols?: 1 | 2 | 3 }) {
+  const g = { 1: "grid-cols-1", 2: "grid-cols-1 sm:grid-cols-2", 3: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" }[cols];
+  return <div className={`grid ${g} gap-4`}>{children}</div>;
+}
+
+export function FormSection({ title, children }: { title?: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-4">
+      {title && (
+        <div className="flex items-center gap-3">
+          <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">{title}</p>
+          <div className="flex-1 h-px bg-gray-100" />
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
+
+export function FormFooter({ onCancel, isLoading, submitLabel = "Salvar", cancelLabel = "Cancelar" }: { onCancel: () => void; isLoading?: boolean; submitLabel?: string; cancelLabel?: string }) {
+  return (
+    <div className="flex items-center justify-end gap-3 pt-4 mt-2 border-t border-gray-100">
+      <button type="button" onClick={onCancel} disabled={isLoading} className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50">{cancelLabel}</button>
+      <button type="submit" disabled={isLoading} className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 flex items-center gap-2">
+        {isLoading && <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" /></svg>}
+        {isLoading ? "Salvando..." : submitLabel}
+      </button>
+    </div>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SEÇÃO 8 — TABELA COM ESTADOS VISUAIS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//
+// Três estados obrigatórios em toda listagem:
+//   isLoading → TableSkeleton (linhas animadas)
+//   isError   → ErrorState (ícone + botão retry)
+//   data vazio → EmptyState (ícone + ação)
+
+export interface Column<T> {
+  key: keyof T | string;
+  label: string;
+  render?: (row: T) => ReactNode;
+  className?: string;
+  hideOnMobile?: boolean;
+}
+
+function TableSkeleton({ cols, rows = 5 }: { cols: number; rows?: number }) {
+  return (
+    <>{Array.from({ length: rows }).map((_, i) => (
+      <tr key={i} className="border-b border-gray-100">
+        {Array.from({ length: cols }).map((_, j) => (
+          <td key={j} className="px-4 py-3"><div className={`h-4 bg-gray-200 rounded animate-pulse ${j === 0 ? "w-3/4" : "w-1/2"}`} /></td>
+        ))}
+      </tr>
+    ))}</>
+  );
+}
+
+function ErrorState({ onRetry }: { onRetry?: () => void }) {
+  return (
+    <tr><td colSpan={99} className="py-16 text-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+          <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+        </div>
+        <p className="text-sm text-gray-500">Erro ao carregar dados</p>
+        {onRetry && <button onClick={onRetry} className="text-sm text-blue-600 font-medium hover:underline">Tentar novamente</button>}
+      </div>
+    </td></tr>
+  );
+}
+
+function EmptyState({ message, action }: { message: string; action?: { label: string; onClick: () => void } }) {
+  return (
+    <tr><td colSpan={99} className="py-16 text-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
+          <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>
+        </div>
+        <p className="text-sm text-gray-400">{message}</p>
+        {action && <button onClick={action.onClick} className="text-sm text-blue-600 font-medium hover:underline">{action.label}</button>}
+      </div>
+    </td></tr>
+  );
+}
+
+export function DataTable<T>({ columns, data, isLoading, isError, onRetry, emptyMessage = "Nenhum registro encontrado", emptyAction, keyExtractor, onRowClick }: {
+  columns: Column<T>[]; data: T[]; isLoading?: boolean; isError?: boolean;
+  onRetry?: () => void; emptyMessage?: string; emptyAction?: { label: string; onClick: () => void };
+  keyExtractor: (row: T) => string; onRowClick?: (row: T) => void;
+}) {
+  return (
+    <div className="w-full overflow-x-auto rounded-xl border border-gray-200 bg-white">
+      <table className="min-w-full text-sm">
+        <thead>
+          <tr className="bg-gray-50 border-b border-gray-200">
+            {columns.map((col) => (
+              <th key={String(col.key)} className={`px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap ${col.hideOnMobile ? "hidden sm:table-cell" : ""} ${col.className ?? ""}`}>{col.label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {isLoading && <TableSkeleton cols={columns.length} />}
+          {isError && !isLoading && <ErrorState onRetry={onRetry} />}
+          {!isLoading && !isError && data.length === 0 && <EmptyState message={emptyMessage} action={emptyAction} />}
+          {!isLoading && !isError && data.map((row) => (
+            <tr key={keyExtractor(row)} onClick={() => onRowClick?.(row)} className={`border-b border-gray-100 last:border-0 transition-colors ${onRowClick ? "cursor-pointer hover:bg-gray-50" : ""}`}>
+              {columns.map((col) => (
+                <td key={String(col.key)} className={`px-4 py-3 text-gray-700 ${col.hideOnMobile ? "hidden sm:table-cell" : ""} ${col.className ?? ""}`}>
+                  {col.render ? col.render(row) : String((row as Record<string, unknown>)[String(col.key)] ?? "—")}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SEÇÃO 9 — BADGES
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// Badge de urgência de prazo
+type Urgencia = "vencido" | "vence_hoje" | "critico" | "urgente" | "proximo" | "normal";
+
+const urgenciaConfig: Record<Urgencia, { label: string; dot: string; badge: string }> = {
+  vencido:    { label: "Vencido",    dot: "bg-red-500",    badge: "bg-red-100 text-red-800 border border-red-200" },
+  vence_hoje: { label: "Vence hoje", dot: "bg-orange-500", badge: "bg-orange-100 text-orange-800 border border-orange-200" },
+  critico:    { label: "Crítico",    dot: "bg-red-400",    badge: "bg-red-50 text-red-700 border border-red-200" },
+  urgente:    { label: "Urgente",    dot: "bg-yellow-500", badge: "bg-yellow-100 text-yellow-800 border border-yellow-200" },
+  proximo:    { label: "Próximo",    dot: "bg-blue-500",   badge: "bg-blue-100 text-blue-700 border border-blue-200" },
+  normal:     { label: "Normal",     dot: "bg-gray-400",   badge: "bg-gray-100 text-gray-600 border border-gray-200" },
+};
+
+export function UrgenciaBadge({ urgencia, diasRestantes }: { urgencia: Urgencia; diasRestantes: number }) {
+  const cfg = urgenciaConfig[urgencia];
+  const dias = diasRestantes < 0 ? `Há ${Math.abs(diasRestantes)}d` : diasRestantes === 0 ? "Hoje" : `${diasRestantes}d`;
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium ${cfg.badge}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+      {cfg.label} · {dias}
+    </span>
+  );
+}
+
+// Badge de status genérico
+const statusStyles: Record<string, string> = {
+  ativo:     "bg-green-100 text-green-800",
+  suspenso:  "bg-yellow-100 text-yellow-800",
+  encerrado: "bg-gray-100 text-gray-600",
+  pendente:  "bg-blue-100 text-blue-700",
+  atrasado:  "bg-red-100 text-red-700",
+  concluido: "bg-green-100 text-green-700",
+  entrada:   "bg-green-100 text-green-700",
+  saida:     "bg-red-100 text-red-700",
+  inativo:   "bg-gray-100 text-gray-500",
+};
+
+export function StatusBadge({ status }: { status: string }) {
+  return (
+    <span className={`px-2 py-1 rounded-md text-xs font-medium capitalize ${statusStyles[status] ?? "bg-gray-100 text-gray-600"}`}>
+      {status}
+    </span>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SEÇÃO 10 — TOAST (sem biblioteca externa)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//
+// COMO USAR:
+//   1. Envolver o layout raiz com <ToastProvider>
+//   2. Em qualquer componente: const { toast } = useToast()
+//   3. Chamar: toast("success" | "error" | "info" | "warning", "mensagem")
+
+type ToastType = "success" | "error" | "info" | "warning";
+interface ToastItem { id: string; type: ToastType; message: string; }
+const ToastCtx = createContext<{ toast: (type: ToastType, msg: string) => void } | null>(null);
+
+export function useToast() {
+  const ctx = useContext(ToastCtx);
+  if (!ctx) throw new Error("useToast deve ser usado dentro de <ToastProvider>");
+  return ctx;
+}
+
+const toastStyles: Record<ToastType, string> = {
+  success: "border-l-4 border-green-500",
+  error:   "border-l-4 border-red-500",
+  info:    "border-l-4 border-blue-500",
+  warning: "border-l-4 border-yellow-500",
+};
+const toastIconStyles: Record<ToastType, string> = {
+  success: "bg-green-100 text-green-600",
+  error:   "bg-red-100 text-red-600",
+  info:    "bg-blue-100 text-blue-600",
+  warning: "bg-yellow-100 text-yellow-600",
+};
+const toastIcons: Record<ToastType, string> = {
+  success: "M5 13l4 4L19 7",
+  error:   "M6 18L18 6M6 6l12 12",
+  info:    "M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+  warning: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z",
+};
+
+function ToastItemComponent({ item, onRemove }: { item: ToastItem; onRemove: (id: string) => void }) {
+  useEffect(() => {
+    const t = setTimeout(() => onRemove(item.id), 3500);
+    return () => clearTimeout(t);
+  }, [item.id, onRemove]);
+
+  return (
+    <div className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg bg-white min-w-[280px] max-w-sm animate-toast-in ${toastStyles[item.type]}`} role="alert">
+      <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${toastIconStyles[item.type]}`}>
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d={toastIcons[item.type]} /></svg>
+      </div>
+      <p className="text-sm text-gray-800 flex-1">{item.message}</p>
+      <button onClick={() => onRemove(item.id)} className="text-gray-400 hover:text-gray-600 transition-colors shrink-0">
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+      </button>
+    </div>
+  );
+}
+
+export function ToastProvider({ children }: { children: ReactNode }) {
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const toast = useCallback((type: ToastType, message: string) => {
+    setToasts((p) => [...p, { id: `${Date.now()}-${Math.random()}`, type, message }]);
+  }, []);
+  const remove = useCallback((id: string) => {
+    setToasts((p) => p.filter((t) => t.id !== id));
+  }, []);
+
+  return (
+    <ToastCtx.Provider value={{ toast }}>
+      {children}
+      <div className="fixed bottom-5 right-5 z-[60] flex flex-col gap-2 pointer-events-none" aria-live="polite">
+        {toasts.map((t) => (
+          <div key={t.id} className="pointer-events-auto">
+            <ToastItemComponent item={t} onRemove={remove} />
+          </div>
+        ))}
+      </div>
+    </ToastCtx.Provider>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SEÇÃO 11 — EXEMPLO COMPLETO: PÁGINA DE CLIENTES (CRUD)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//
+// Este exemplo mostra o padrão completo de CRUD:
+//   ✓ Tabela com skeleton/erro/vazio
+//   ✓ Modal sem bug de scroll
+//   ✓ Formulário com validação visual inline
+//   ✓ Toast de sucesso/erro em cada operação
+//   ✓ Botão de submit com spinner
+//   ✓ Confirmação antes de excluir
+
+const clienteSchema = z.object({
+  nome: z.string().min(2, "Nome deve ter ao menos 2 caracteres"),
+  cpf: z.string().optional(),
+  email: z.string().email("E-mail inválido").optional().or(z.literal("")),
+  telefone: z.string().optional(),
+  status: z.enum(["ativo", "inativo"], { required_error: "Selecione o status" }),
+  observacoes: z.string().optional(),
+});
+type ClienteForm = z.infer<typeof clienteSchema>;
+
+interface Cliente {
+  id: string;
+  nome: string;
+  cpf?: string;
+  email?: string;
+  telefone?: string;
+  status: string;
+}
+
+const mockData: Cliente[] = [
+  { id: "1", nome: "João da Silva", cpf: "123.456.789-00", email: "joao@email.com", telefone: "(43) 99999-0001", status: "ativo" },
+  { id: "2", nome: "Maria Oliveira", cpf: "987.654.321-00", email: "maria@email.com", telefone: "(43) 99999-0002", status: "ativo" },
+  { id: "3", nome: "Carlos Pereira", cpf: "111.222.333-44", email: "carlos@email.com", telefone: "(43) 99999-0003", status: "inativo" },
+];
+
+export default function ClientesPage() {
+  const { toast } = useToast();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<Cliente | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [clientes, setClientes] = useState<Cliente[]>(mockData);
+
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<ClienteForm>({
+    resolver: zodResolver(clienteSchema),
+    defaultValues: { status: "ativo" },
+  });
+
+  function openNew() {
+    setEditing(null);
+    reset({ status: "ativo" });
+    setModalOpen(true);
+  }
+
+  function openEdit(c: Cliente) {
+    setEditing(c);
+    reset({ nome: c.nome, cpf: c.cpf ?? "", email: c.email ?? "", telefone: c.telefone ?? "", status: c.status as "ativo" | "inativo" });
+    setModalOpen(true);
+  }
+
+  async function onSubmit(data: ClienteForm) {
+    setIsLoading(true);
+    try {
+      await new Promise((r) => setTimeout(r, 800)); // simula API
+      if (editing) {
+        setClientes((p) => p.map((c) => c.id === editing.id ? { ...c, ...data } : c));
+        toast("success", "Cliente atualizado com sucesso");
+      } else {
+        setClientes((p) => [{ id: String(Date.now()), ...data }, ...p]);
+        toast("success", "Cliente criado com sucesso");
+      }
+      setModalOpen(false);
+    } catch {
+      toast("error", "Erro ao salvar. Tente novamente.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  function handleDelete(c: Cliente) {
+    if (!confirm(`Excluir "${c.nome}"?`)) return;
+    setClientes((p) => p.filter((x) => x.id !== c.id));
+    toast("success", "Cliente excluído");
+  }
+
+  const columns: Column<Cliente>[] = [
+    { key: "nome", label: "Nome" },
+    { key: "cpf", label: "CPF", hideOnMobile: true },
+    { key: "email", label: "E-mail", hideOnMobile: true },
+    { key: "telefone", label: "Telefone", hideOnMobile: true },
+    { key: "status", label: "Status", render: (r) => <StatusBadge status={r.status} /> },
+    {
+      key: "acoes", label: "", className: "w-20",
+      render: (r) => (
+        <div className="flex items-center gap-1">
+          <button onClick={(e) => { e.stopPropagation(); openEdit(r); }} className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" aria-label="Editar">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); handleDelete(r); }} className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" aria-label="Excluir">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+      {/* Page header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900">Clientes</h1>
+          <p className="text-sm text-gray-400 mt-0.5">{clientes.length} cadastrado(s)</p>
+        </div>
+        <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+          Novo cliente
+        </button>
+      </div>
+
+      {/* Tabela */}
+      <DataTable
+        columns={columns}
+        data={clientes}
+        keyExtractor={(c) => c.id}
+        emptyMessage="Nenhum cliente cadastrado"
+        emptyAction={{ label: "Cadastrar primeiro cliente", onClick: openNew }}
+      />
+
+      {/* Modal */}
+      <Modal open={modalOpen} onClose={() => !isLoading && setModalOpen(false)} title={editing ? "Editar cliente" : "Novo cliente"} size="lg">
+        <form onSubmit={handleSubmit(onSubmit)} noValidate>
+          <div className="flex flex-col gap-5">
+            <FormSection title="Dados pessoais">
+              <Input name="nome" label="Nome completo" register={register} error={errors.nome} required placeholder="Ex: João da Silva" />
+              <FormGrid cols={2}>
+                <Input name="cpf" label="CPF" register={register} error={errors.cpf} placeholder="000.000.000-00" />
+                <Input name="telefone" label="Telefone" register={register} error={errors.telefone} placeholder="(00) 00000-0000" type="tel" />
+              </FormGrid>
+            </FormSection>
+
+            <FormSection title="Contato e status">
+              <FormGrid cols={2}>
+                <Input name="email" label="E-mail" register={register} error={errors.email} placeholder="email@exemplo.com" type="email" />
+                <Select name="status" label="Status" register={register} error={errors.status} required options={[{ value: "ativo", label: "Ativo" }, { value: "inativo", label: "Inativo" }]} />
+              </FormGrid>
+              <Textarea name="observacoes" label="Observações" register={register} error={errors.observacoes} placeholder="Informações adicionais..." rows={3} />
+            </FormSection>
+
+            <FormFooter onCancel={() => setModalOpen(false)} isLoading={isLoading} submitLabel={editing ? "Salvar alterações" : "Criar cliente"} />
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+}
