@@ -41,10 +41,10 @@ export function ToastContainer() {
           )}
         >
           {icons[t.type]}
-          <p className="text-sm text-slate-200">{t.message}</p>
+          <p className="text-sm text-zinc-200">{t.message}</p>
           <button
             onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
-            className="ml-2 text-slate-500 hover:text-slate-300 transition-colors"
+            className="ml-2 text-zinc-500 hover:text-zinc-300 transition-colors"
           >
             <X className="h-4 w-4" />
           </button>

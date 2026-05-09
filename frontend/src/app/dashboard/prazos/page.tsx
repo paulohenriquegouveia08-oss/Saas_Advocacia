@@ -59,29 +59,29 @@ export default function PrazosPage() {
       <PageHeader title="Prazos" description="Controle de prazos processuais" action={{ label: 'Novo Prazo', onClick: () => open() }} />
       <div className="flex gap-2 mb-6">
         {(['', 'pendente', 'atrasado', 'concluido'] as const).map((s) => (
-          <button key={s} onClick={() => setStatusFilter(s)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${statusFilter === s ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'bg-slate-800/50 text-slate-400 border border-slate-700/50 hover:bg-slate-800'}`}>
+          <button key={s} onClick={() => setStatusFilter(s)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${statusFilter === s ? 'bg-gold-600/20 text-gold-400 border border-gold-500/30' : 'bg-zinc-800/50 text-zinc-400 border border-zinc-700/50 hover:bg-zinc-800'}`}>
             {s === '' ? 'Todos' : s === 'concluido' ? 'Concluído' : s.charAt(0).toUpperCase() + s.slice(1)}
           </button>
         ))}
       </div>
       {isLoading ? <TableSkeleton rows={5} cols={6} /> : isError ? <ErrorState onRetry={refetch} /> : !data?.length ? <EmptyState message="Nenhum prazo encontrado." /> : (
-        <div className="overflow-hidden rounded-2xl border border-slate-800/50 bg-slate-900/50">
+        <div className="overflow-hidden rounded-2xl border border-zinc-800/50 bg-zinc-900/50">
           <table className="w-full">
-            <thead><tr className="border-b border-slate-800/50 bg-slate-900/80">
-              {['Processo','Descrição','Vencimento','Dias','Urgência','Status',''].map(h => <th key={h} className={`${h===''?'text-right':'text-left'} px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider`}>{h || 'Ações'}</th>)}
+            <thead><tr className="border-b border-zinc-800/50 bg-zinc-900/80">
+              {['Processo','Descrição','Vencimento','Dias','Urgência','Status',''].map(h => <th key={h} className={`${h===''?'text-right':'text-left'} px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider`}>{h || 'Ações'}</th>)}
             </tr></thead>
             <tbody>{data.map((d) => (
-              <tr key={d.id} className={`border-b border-slate-800/30 table-row-hover ${d.urgencia === 'vencido' || d.urgencia === 'vence_hoje' ? 'bg-red-500/[0.03]' : ''}`}>
-                <td className="px-6 py-3.5 text-sm font-mono text-slate-300">{d.processo_numero || '—'}</td>
-                <td className="px-6 py-3.5 text-sm text-slate-300 max-w-xs truncate">{d.descricao || '—'}</td>
-                <td className="px-6 py-3.5 text-sm text-slate-400">{formatDate(d.data_vencimento)}</td>
-                <td className="px-6 py-3.5 text-sm text-slate-400">{d.dias_restantes !== null ? `${d.dias_restantes}d` : '—'}</td>
+              <tr key={d.id} className={`border-b border-zinc-800/30 table-row-hover ${d.urgencia === 'vencido' || d.urgencia === 'vence_hoje' ? 'bg-red-500/[0.03]' : ''}`}>
+                <td className="px-6 py-3.5 text-sm font-mono text-zinc-300">{d.processo_numero || '—'}</td>
+                <td className="px-6 py-3.5 text-sm text-zinc-300 max-w-xs truncate">{d.descricao || '—'}</td>
+                <td className="px-6 py-3.5 text-sm text-zinc-400">{formatDate(d.data_vencimento)}</td>
+                <td className="px-6 py-3.5 text-sm text-zinc-400">{d.dias_restantes !== null ? `${d.dias_restantes}d` : '—'}</td>
                 <td className="px-6 py-3.5">{d.urgencia ? <UrgenciaBadge urgencia={d.urgencia} /> : '—'}</td>
                 <td className="px-6 py-3.5"><Badge variant={sv[d.status]}>{d.status === 'concluido' ? 'Concluído' : d.status.charAt(0).toUpperCase() + d.status.slice(1)}</Badge></td>
                 <td className="px-6 py-3.5 text-right"><div className="flex items-center justify-end gap-1">
-                  {d.status !== 'concluido' && <button onClick={() => complete.mutate(d.id)} className="p-2 rounded-lg text-slate-400 hover:bg-emerald-500/10 hover:text-emerald-400 transition-colors" title="Concluir"><CheckCircle className="h-4 w-4" /></button>}
-                  <button onClick={() => open(d)} className="p-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-indigo-400 transition-colors"><Pencil className="h-4 w-4" /></button>
-                  <button onClick={() => setDeleteId(d.id)} className="p-2 rounded-lg text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-colors"><Trash2 className="h-4 w-4" /></button>
+                  {d.status !== 'concluido' && <button onClick={() => complete.mutate(d.id)} className="p-2 rounded-lg text-zinc-400 hover:bg-emerald-500/10 hover:text-emerald-400 transition-colors" title="Concluir"><CheckCircle className="h-4 w-4" /></button>}
+                  <button onClick={() => open(d)} className="p-2 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-gold-400 transition-colors"><Pencil className="h-4 w-4" /></button>
+                  <button onClick={() => setDeleteId(d.id)} className="p-2 rounded-lg text-zinc-400 hover:bg-red-500/10 hover:text-red-400 transition-colors"><Trash2 className="h-4 w-4" /></button>
                 </div></td>
               </tr>
             ))}</tbody>
@@ -91,8 +91,8 @@ export default function PrazosPage() {
       <Modal isOpen={isModalOpen} onClose={close} title={editing ? 'Editar Prazo' : 'Novo Prazo'}>
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">Processo *</label>
-            <select value={form.process_id} onChange={e => setForm({ ...form, process_id: e.target.value })} required className="w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <label className="block text-sm font-medium text-zinc-300 mb-1.5">Processo *</label>
+            <select value={form.process_id} onChange={e => setForm({ ...form, process_id: e.target.value })} required className="w-full rounded-xl border border-zinc-700 bg-zinc-800/50 px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-gold-500">
               <option value="">Selecione um processo</option>
               {processes.map(p => <option key={p.id} value={p.id}>{p.numero}</option>)}
             </select>

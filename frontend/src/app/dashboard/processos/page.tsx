@@ -114,8 +114,8 @@ export default function ProcessosPage() {
             onClick={() => setStatusFilter(s)}
             className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
               statusFilter === s
-                ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30'
-                : 'bg-slate-800/50 text-slate-400 border border-slate-700/50 hover:bg-slate-800 hover:text-slate-300'
+                ? 'bg-gold-600/20 text-gold-400 border border-gold-500/30'
+                : 'bg-zinc-800/50 text-zinc-400 border border-zinc-700/50 hover:bg-zinc-800 hover:text-zinc-300'
             }`}
           >
             {s === '' ? 'Todos' : s.charAt(0).toUpperCase() + s.slice(1)}
@@ -131,35 +131,35 @@ export default function ProcessosPage() {
       ) : !processes?.length ? (
         <EmptyState message="Nenhum processo encontrado." />
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-800/50 bg-slate-900/50">
+        <div className="overflow-hidden rounded-2xl border border-zinc-800/50 bg-zinc-900/50">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-slate-800/50 bg-slate-900/80">
-                  <th className="text-left px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Número</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Cliente</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Tipo de Ação</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Tribunal</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Criado em</th>
-                  <th className="text-right px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Ações</th>
+                <tr className="border-b border-zinc-800/50 bg-zinc-900/80">
+                  <th className="text-left px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Número</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Cliente</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Tipo de Ação</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Tribunal</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Status</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Criado em</th>
+                  <th className="text-right px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {processes.map((proc) => (
-                  <tr key={proc.id} className="border-b border-slate-800/30 table-row-hover">
+                  <tr key={proc.id} className="border-b border-zinc-800/30 table-row-hover">
                     <td className="px-6 py-3.5 text-sm font-mono font-medium text-white">{proc.numero}</td>
-                    <td className="px-6 py-3.5 text-sm text-slate-300">{proc.cliente_nome || '—'}</td>
-                    <td className="px-6 py-3.5 text-sm text-slate-400">{proc.tipo_acao || '—'}</td>
-                    <td className="px-6 py-3.5 text-sm text-slate-400">{proc.tribunal || '—'}</td>
+                    <td className="px-6 py-3.5 text-sm text-zinc-300">{proc.cliente_nome || '—'}</td>
+                    <td className="px-6 py-3.5 text-sm text-zinc-400">{proc.tipo_acao || '—'}</td>
+                    <td className="px-6 py-3.5 text-sm text-zinc-400">{proc.tribunal || '—'}</td>
                     <td className="px-6 py-3.5"><StatusBadge status={proc.status} /></td>
-                    <td className="px-6 py-3.5 text-sm text-slate-500">{formatDate(proc.created_at)}</td>
+                    <td className="px-6 py-3.5 text-sm text-zinc-500">{formatDate(proc.created_at)}</td>
                     <td className="px-6 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => openEdit(proc)} className="p-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-indigo-400 transition-colors">
+                        <button onClick={() => openEdit(proc)} className="p-2 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-gold-400 transition-colors">
                           <Pencil className="h-4 w-4" />
                         </button>
-                        <button onClick={() => setDeleteId(proc.id)} className="p-2 rounded-lg text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-colors">
+                        <button onClick={() => setDeleteId(proc.id)} className="p-2 rounded-lg text-zinc-400 hover:bg-red-500/10 hover:text-red-400 transition-colors">
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
@@ -177,8 +177,8 @@ export default function ProcessosPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input id="numero" label="Número do Processo *" value={formData.numero} onChange={(e) => setFormData({ ...formData, numero: e.target.value })} required />
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">Cliente *</label>
-            <select value={formData.client_id} onChange={(e) => setFormData({ ...formData, client_id: e.target.value })} required className="w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <label className="block text-sm font-medium text-zinc-300 mb-1.5">Cliente *</label>
+            <select value={formData.client_id} onChange={(e) => setFormData({ ...formData, client_id: e.target.value })} required className="w-full rounded-xl border border-zinc-700 bg-zinc-800/50 px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-gold-500">
               <option value="">Selecione um cliente</option>
               {clients.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
             </select>
@@ -188,11 +188,11 @@ export default function ProcessosPage() {
           <Input id="parte_contraria" label="Parte Contrária" value={formData.parte_contraria || ''} onChange={(e) => setFormData({ ...formData, parte_contraria: e.target.value })} />
           {editingProcess && (
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-slate-300">Status</label>
+              <label className="block text-sm font-medium text-zinc-300">Status</label>
               <select
                 value={formData.status || 'ativo'}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value as ProcessStatus })}
-                className="w-full rounded-lg border border-slate-700 bg-slate-800/50 px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-4 py-2.5 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-gold-500"
               >
                 <option value="ativo">Ativo</option>
                 <option value="suspenso">Suspenso</option>

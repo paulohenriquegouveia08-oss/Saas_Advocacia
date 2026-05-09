@@ -24,7 +24,7 @@ export function Topbar() {
   const count = unreadCount?.count ?? 0
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-800/50 bg-slate-950/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-30 border-b border-zinc-800/50 bg-zinc-950/80 backdrop-blur-xl">
       <div className="flex items-center justify-between px-6 py-3">
         <div />
 
@@ -32,7 +32,7 @@ export function Topbar() {
           {/* Notifications */}
           <button
             onClick={() => router.push('/dashboard/notificacoes')}
-            className="relative p-2.5 rounded-xl text-slate-400 hover:bg-slate-800/50 hover:text-white transition-all duration-200"
+            className="relative p-2.5 rounded-xl text-zinc-400 hover:bg-zinc-800/50 hover:text-white transition-all duration-200"
           >
             <Bell className="h-5 w-5" />
             {count > 0 && (
@@ -47,7 +47,7 @@ export function Topbar() {
 
           {/* User menu */}
           <button
-            className="p-2.5 rounded-xl text-slate-400 hover:bg-slate-800/50 hover:text-white transition-all duration-200"
+            className="p-2.5 rounded-xl text-zinc-400 hover:bg-zinc-800/50 hover:text-white transition-all duration-200"
           >
             <User className="h-5 w-5" />
           </button>
@@ -55,7 +55,7 @@ export function Topbar() {
           {/* Logout */}
           <button
             onClick={handleSignOut}
-            className="p-2.5 rounded-xl text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200"
+            className="p-2.5 rounded-xl text-zinc-400 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200"
             title="Sair"
           >
             <LogOut className="h-5 w-5" />

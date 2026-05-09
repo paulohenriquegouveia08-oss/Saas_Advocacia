@@ -57,7 +57,7 @@ export default function NotificacoesPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Notificações</h1>
-          <p className="text-sm text-slate-400 mt-1">
+          <p className="text-sm text-zinc-400 mt-1">
             {unread > 0 ? `${unread} não lida${unread > 1 ? 's' : ''}` : 'Todas as notificações lidas'}
           </p>
         </div>
@@ -70,7 +70,7 @@ export default function NotificacoesPage() {
       </div>
 
       {isLoading ? <TableSkeleton rows={5} cols={3} /> : isError ? <ErrorState onRetry={refetch} /> : !data?.length ? (
-        <EmptyState message="Nenhuma notificação." icon={<Bell className="h-8 w-8 text-slate-500" />} />
+        <EmptyState message="Nenhuma notificação." icon={<Bell className="h-8 w-8 text-zinc-500" />} />
       ) : (
         <div className="space-y-2">
           {data.map((n) => (
@@ -80,17 +80,17 @@ export default function NotificacoesPage() {
               className={cn(
                 'flex items-start gap-4 px-5 py-4 rounded-xl border transition-all duration-200 cursor-pointer',
                 n.lida
-                  ? 'border-slate-800/30 bg-slate-900/30 opacity-60'
-                  : 'border-slate-800/50 bg-slate-900/50 hover:bg-slate-800/50 hover:border-slate-700/50'
+                  ? 'border-zinc-800/30 bg-zinc-900/30 opacity-60'
+                  : 'border-zinc-800/50 bg-zinc-900/50 hover:bg-zinc-800/50 hover:border-zinc-700/50'
               )}
             >
-              <div className={cn('mt-0.5 flex-shrink-0 w-2 h-2 rounded-full', n.lida ? 'bg-transparent' : 'bg-indigo-400 animate-pulse')} />
+              <div className={cn('mt-0.5 flex-shrink-0 w-2 h-2 rounded-full', n.lida ? 'bg-transparent' : 'bg-gold-400 animate-pulse')} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <Badge variant={tipoBadge[n.tipo]?.variant || 'info'}>{tipoBadge[n.tipo]?.label || n.tipo}</Badge>
-                  <span className="text-xs text-slate-500">{timeAgo(n.created_at)}</span>
+                  <span className="text-xs text-zinc-500">{timeAgo(n.created_at)}</span>
                 </div>
-                <p className={cn('text-sm', n.lida ? 'text-slate-500' : 'text-slate-200')}>{n.mensagem}</p>
+                <p className={cn('text-sm', n.lida ? 'text-zinc-500' : 'text-zinc-200')}>{n.mensagem}</p>
               </div>
             </div>
           ))}

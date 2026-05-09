@@ -7,7 +7,7 @@ interface BadgeProps {
 }
 
 const variantClasses = {
-  default: 'bg-slate-700/80 text-slate-300 border-slate-600',
+  default: 'bg-zinc-700/80 text-zinc-300 border-zinc-600',
   success: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
   warning: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
   danger: 'bg-red-500/15 text-red-400 border-red-500/30',

@@ -5,11 +5,16 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  
+  /* Bright Gold Theme */
+  --color-gold-400: #FACC15; /* Tailwind yellow-400 */
+  --color-gold-500: #EAB308; /* Tailwind yellow-500 */
+  --color-gold-600: #CA8A04; /* Tailwind yellow-600 */
 }
 
 :root {
-  --background: #0a0e1a;
-  --foreground: #e2e8f0;
+  --background: #000000;
+  --foreground: #f4f4f5; /* zinc-100 */
 }
 
 body {
@@ -27,11 +32,21 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: #3f3f46; /* zinc-700 */
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #52525b; /* zinc-600 */
+}
+
+/* Esconder setas de input number */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
 }
 
 /* Animations */

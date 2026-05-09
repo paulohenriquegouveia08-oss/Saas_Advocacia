@@ -46,16 +46,16 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
       <div
         className={cn(
-          'relative w-full rounded-xl border border-slate-700/50 bg-slate-900 shadow-2xl',
-          'animate-in fade-in zoom-in-95 duration-200',
+          'relative w-full rounded-2xl border border-zinc-700/50 bg-zinc-900 shadow-2xl',
+          'animate-in fade-in zoom-in-95 duration-200 mt-8 mb-8',
           sizes[size]
         )}
       >
-        <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-zinc-800 px-6 py-4">
           <h2 className="text-lg font-semibold text-white">{title}</h2>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+            className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
@@ -78,11 +78,11 @@ interface ConfirmModalProps {
 export function ConfirmModal({ isOpen, onClose, onConfirm, title, message, isLoading }: ConfirmModalProps) {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="sm">
-      <p className="text-slate-400 mb-6">{message}</p>
+      <p className="text-zinc-400 mb-6">{message}</p>
       <div className="flex justify-end gap-3">
         <button
           onClick={onClose}
-          className="px-4 py-2 text-sm rounded-lg text-slate-300 hover:bg-slate-800 transition-colors"
+          className="px-4 py-2 text-sm rounded-lg text-zinc-300 hover:bg-zinc-800 transition-colors"
         >
           Cancelar
         </button>
