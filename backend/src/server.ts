@@ -8,6 +8,8 @@ import { processRoutes } from './modules/processes/process.routes'
 import { deadlineRoutes } from './modules/deadlines/deadline.routes'
 import { notificationRoutes } from './modules/notifications/notification.routes'
 import { financialRoutes } from './modules/financial/financial.routes'
+import { settingsRoutes } from './modules/settings/settings.routes'
+import { rolesRoutes } from './modules/roles/roles.routes'
 import { startDeadlineNotificationJob } from './jobs/deadline-notifications.job'
 import { pool } from './config/database'
 
@@ -149,6 +151,8 @@ async function bootstrap() {
   await app.register(deadlineRoutes)
   await app.register(notificationRoutes)
   await app.register(financialRoutes)
+  await app.register(settingsRoutes)
+  await app.register(rolesRoutes, { prefix: '/roles' })
 
   // Start notification cron job
   startDeadlineNotificationJob()

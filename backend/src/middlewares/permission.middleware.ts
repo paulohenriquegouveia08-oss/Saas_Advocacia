@@ -10,7 +10,7 @@ export function requirePermission(...permissions: Permission[]) {
       throw ApiError.unauthorized('Não autenticado')
     }
 
-    const hasAll = permissions.every((p) => hasPermission(user.role, p))
+    const hasAll = permissions.every((p) => user.permissions?.includes(p))
 
     if (!hasAll) {
       throw ApiError.forbidden(

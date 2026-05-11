@@ -43,7 +43,7 @@ export default function FinanceiroPage() {
 
   function open(f?: Financial) { 
     setEditing(f || null); 
-    setForm(f ? { tipo: f.tipo, descricao: f.descricao || '', valor: f.valor, categoria: f.categoria || '', data: f.data || '', client_id: f.client_id || '' } : { tipo: 'entrada', valor: 0 }); 
+    setForm(f ? { tipo: f.tipo, descricao: f.descricao || '', valor: f.valor, categoria: f.categoria || '', data: f.data || '', client_id: f.client_id || null } : { tipo: 'entrada', valor: 0, client_id: null }); 
     setValorInput(f ? String(f.valor) : '');
     setStep(f ? 'form' : 'type');
     setIsModalOpen(true); 
@@ -52,8 +52,8 @@ export default function FinanceiroPage() {
   function submit(e: React.FormEvent) { e.preventDefault(); editing ? update.mutate({ id: editing.id, d: form }) : create.mutate(form) }
 
   const summaryCards = [
-    { label: 'Entradas', value: summary?.entradas ?? 0, icon: TrendingUp, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-    { label: 'Saídas', value: summary?.saidas ?? 0, icon: TrendingDown, color: 'text-red-400', bg: 'bg-red-500/10' },
+    { label: 'Entradas', value: summary?.total_entradas ?? 0, icon: TrendingUp, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+    { label: 'Saídas', value: summary?.total_saidas ?? 0, icon: TrendingDown, color: 'text-red-400', bg: 'bg-red-500/10' },
     { label: 'Saldo', value: summary?.saldo ?? 0, icon: DollarSign, color: (summary?.saldo ?? 0) >= 0 ? 'text-emerald-400' : 'text-red-400', bg: (summary?.saldo ?? 0) >= 0 ? 'bg-emerald-500/10' : 'bg-red-500/10' },
   ]
 
@@ -64,7 +64,7 @@ export default function FinanceiroPage() {
       {/* Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         {summaryCards.map((c) => (
-          <div key={c.label} className="rounded-2xl border border-zinc-800/50 bg-zinc-900/50 p-5 flex items-center gap-4">
+          <div key={c.label} className="rounded-2xl border border-zinc-800/80 bg-[#121212] p-5 flex items-center gap-4 shadow-sm">
             <div className={`flex items-center justify-center w-10 h-10 rounded-xl ${c.bg}`}>
               <c.icon className={`h-5 w-5 ${c.color}`} />
             </div>
@@ -79,7 +79,7 @@ export default function FinanceiroPage() {
       {/* Filter */}
       <div className="flex gap-2 mb-6">
         {(['', 'entrada', 'saida'] as const).map((t) => (
-          <button key={t} onClick={() => setTipoFilter(t)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${tipoFilter === t ? 'bg-gold-600/20 text-gold-400 border border-gold-500/30' : 'bg-zinc-800/50 text-zinc-400 border border-zinc-700/50 hover:bg-zinc-800'}`}>
+          <button key={t} onClick={() => setTipoFilter(t)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${tipoFilter === t ? 'bg-gold-500/10 text-gold-500 border border-gold-500/30' : 'bg-[#121212] text-zinc-400 border border-zinc-800 hover:bg-[#1A1A1A]'}`}>
             {t === '' ? 'Todos' : t === 'entrada' ? 'Entradas' : 'Saídas'}
           </button>
         ))}
@@ -87,9 +87,9 @@ export default function FinanceiroPage() {
 
       {/* Table */}
       {isLoading ? <TableSkeleton rows={5} cols={5} /> : isError ? <ErrorState onRetry={refetch} /> : !data?.length ? <EmptyState message="Nenhuma transação encontrada." /> : (
-        <div className="overflow-hidden rounded-2xl border border-zinc-800/50 bg-zinc-900/50">
+        <div className="overflow-hidden rounded-2xl border border-zinc-800/80 bg-[#121212] shadow-sm">
           <table className="w-full">
-            <thead><tr className="border-b border-zinc-800/50 bg-zinc-900/80">
+            <thead><tr className="border-b border-zinc-800/60 bg-[#1A1A1A]">
               {['Tipo','Descrição','Categoria','Data','Valor',''].map(h => <th key={h} className={`${h===''?'text-right':'text-left'} px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider`}>{h || 'Ações'}</th>)}
             </tr></thead>
             <tbody>{data.map((f) => (
@@ -100,7 +100,7 @@ export default function FinanceiroPage() {
                 <td className="px-6 py-3.5 text-sm text-zinc-400">{formatDate(f.data)}</td>
                 <td className={`px-6 py-3.5 text-sm font-semibold ${f.tipo === 'entrada' ? 'text-emerald-400' : 'text-red-400'}`}>{formatCurrency(f.valor)}</td>
                 <td className="px-6 py-3.5 text-right"><div className="flex items-center justify-end gap-1">
-                  <button onClick={() => open(f)} className="p-2 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-gold-400 transition-colors"><Pencil className="h-4 w-4" /></button>
+                  <button onClick={() => open(f)} className="p-2 rounded-lg text-zinc-400 hover:bg-[#1A1A1A] hover:text-gold-400 transition-colors"><Pencil className="h-4 w-4" /></button>
                   <button onClick={() => setDeleteId(f.id)} className="p-2 rounded-lg text-zinc-400 hover:bg-red-500/10 hover:text-red-400 transition-colors"><Trash2 className="h-4 w-4" /></button>
                 </div></td>
               </tr>
@@ -112,13 +112,13 @@ export default function FinanceiroPage() {
       <Modal isOpen={isModalOpen} onClose={close} title={editing ? 'Editar Transação' : 'Nova Transação'}>
         {step === 'type' ? (
           <div className="grid grid-cols-2 gap-4 py-4">
-            <button onClick={() => { setForm({ ...form, tipo: 'entrada', categoria: '' }); setStep('form') }} className="flex flex-col items-center justify-center p-6 border border-zinc-800 rounded-2xl hover:bg-emerald-500/10 hover:border-emerald-500/50 transition-all group">
+            <button onClick={() => { setForm({ ...form, tipo: 'entrada', categoria: '' }); setStep('form') }} className="flex flex-col items-center justify-center p-6 border border-zinc-800 bg-[#121212] rounded-2xl hover:bg-emerald-500/10 hover:border-emerald-500/50 transition-all group">
               <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <ArrowUpRight className="h-6 w-6 text-emerald-400" />
               </div>
               <span className="font-semibold text-zinc-100">Entrada</span>
             </button>
-            <button onClick={() => { setForm({ ...form, tipo: 'saida', categoria: '' }); setStep('form') }} className="flex flex-col items-center justify-center p-6 border border-zinc-800 rounded-2xl hover:bg-red-500/10 hover:border-red-500/50 transition-all group">
+            <button onClick={() => { setForm({ ...form, tipo: 'saida', categoria: '' }); setStep('form') }} className="flex flex-col items-center justify-center p-6 border border-zinc-800 bg-[#121212] rounded-2xl hover:bg-red-500/10 hover:border-red-500/50 transition-all group">
               <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <ArrowDownRight className="h-6 w-6 text-red-400" />
               </div>
@@ -131,7 +131,7 @@ export default function FinanceiroPage() {
             <Input id="descricao" label="Descrição" value={form.descricao || ''} onChange={e => setForm({ ...form, descricao: e.target.value })} />
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-zinc-300">Categoria</label>
-              <select value={form.categoria || ''} onChange={e => setForm({ ...form, categoria: e.target.value })} className="w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-4 py-2.5 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-gold-500">
+              <select value={form.categoria || ''} onChange={e => setForm({ ...form, categoria: e.target.value })} className="w-full h-11 rounded-xl border border-zinc-800 bg-[#121212] px-4 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-gold-500/50 focus:border-gold-500 transition-all duration-300">
                 <option value="">Selecione uma categoria...</option>
                 {(form.tipo === 'entrada' ? ['Honorários', 'Consultoria', 'Acordos', 'Reembolso de Custas', 'Outros'] : ['Custas Judiciais', 'Salários', 'Impostos', 'Aluguel', 'Material de Escritório', 'Marketing', 'OAB', 'Software', 'Custos Escritório', 'Outros']).map(c => (
                   <option key={c} value={c}>{c}</option>

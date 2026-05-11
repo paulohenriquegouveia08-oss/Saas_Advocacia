@@ -13,8 +13,8 @@ export interface Financial {
 }
 
 export interface FinancialSummary {
-  entradas: number
-  saidas: number
+  total_entradas: number
+  total_saidas: number
   saldo: number
 }
 
@@ -25,7 +25,7 @@ export interface CreateFinancialData {
   categoria?: string
   status?: string
   data?: string
-  client_id?: string
+  client_id?: string | null
 }
 
 export interface UpdateFinancialData extends Partial<CreateFinancialData> {}

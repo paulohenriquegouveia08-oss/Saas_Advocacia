@@ -6,14 +6,14 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   
-  /* Bright Gold Theme */
-  --color-gold-400: #FACC15; /* Tailwind yellow-400 */
-  --color-gold-500: #EAB308; /* Tailwind yellow-500 */
-  --color-gold-600: #CA8A04; /* Tailwind yellow-600 */
+  /* Premium Gold Theme */
+  --color-gold-400: #E0B84C; 
+  --color-gold-500: #D4AF37; 
+  --color-gold-600: #C9A227; 
 }
 
 :root {
-  --background: #000000;
+  --background: #0B0B0B;
   --foreground: #f4f4f5; /* zinc-100 */
 }
 
@@ -68,8 +68,8 @@ input[type="number"] {
 
 /* Table row hover */
 .table-row-hover {
-  transition: background-color 0.15s ease;
+  transition: background-color 0.2s ease;
 }
 .table-row-hover:hover {
-  background-color: rgba(99, 102, 241, 0.04);
+  background-color: #1A1A1A;
 }

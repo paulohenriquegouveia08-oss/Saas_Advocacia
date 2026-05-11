@@ -104,7 +104,7 @@ export default function ClientesPage() {
           placeholder="Buscar por nome ou CPF..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-zinc-700 bg-zinc-800/50 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-gold-500 focus:border-transparent transition-all"
+          className="w-full pl-10 pr-4 h-11 rounded-xl border border-zinc-800 bg-[#121212] text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-gold-500/50 focus:border-gold-500 transition-all duration-300"
         />
       </div>
 
@@ -116,11 +116,11 @@ export default function ClientesPage() {
       ) : !clients?.length ? (
         <EmptyState message="Nenhum cliente encontrado." />
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-zinc-800/50 bg-zinc-900/50">
+        <div className="overflow-hidden rounded-2xl border border-zinc-800/80 bg-[#121212] shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-zinc-800/50 bg-zinc-900/80">
+                <tr className="border-b border-zinc-800/60 bg-[#1A1A1A]">
                   <th className="text-left px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Nome</th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">CPF</th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Telefone</th>
@@ -139,7 +139,7 @@ export default function ClientesPage() {
                     <td className="px-6 py-3.5 text-sm text-zinc-500">{formatDate(client.created_at)}</td>
                     <td className="px-6 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => openEdit(client)} className="p-2 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-gold-400 transition-colors">
+                        <button onClick={() => openEdit(client)} className="p-2 rounded-lg text-zinc-400 hover:bg-[#1A1A1A] hover:text-gold-400 transition-colors">
                           <Pencil className="h-4 w-4" />
                         </button>
                         <button onClick={() => setDeleteId(client.id)} className="p-2 rounded-lg text-zinc-400 hover:bg-red-500/10 hover:text-red-400 transition-colors">

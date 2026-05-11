@@ -16,6 +16,52 @@ import { StatusBadge } from '@/components/ui/Badge'
 import { Pencil, Trash2 } from 'lucide-react'
 import type { Process, CreateProcessData, ProcessStatus } from '@/types/process'
 
+const TIPOS_ACAO = [
+  'Ação Civil',
+  'Ação de Execução',
+  'Ação de Investigação de Paternidade',
+  'Ação de Obrigação de Fazer',
+  'Ação de Repetição de Indébito',
+  'Ação de Rescisão',
+  'Ação Popular',
+  'Ação Trabalhista',
+  'Ação Tributária',
+  'Embargos à Execução',
+  'Habeas Corpus',
+  'Mandado de Segurança',
+  'Procedimento Comum',
+  'Procedimento Especial',
+  'Recurso',
+  'Outro',
+]
+
+const TRIBUNAIS = [
+  'STF - Supremo Tribunal Federal',
+  'STJ - Superior Tribunal de Justiça',
+  'TJSP - TJ de São Paulo',
+  'TJRJ - TJ do Rio de Janeiro',
+  'TJMG - TJ de Minas Gerais',
+  'TJRS - TJ do Rio Grande do Sul',
+  'TJPR - TJ do Paraná',
+  'TJSC - TJ de Santa Catarina',
+  'TJBA - TJ da Bahia',
+  'TJGO - TJ de Goiás',
+  'TJPE - TJ de Pernambuco',
+  'TJCE - TJ do Ceará',
+  'TJPA - TJ do Pará',
+  'TJMA - TJ do Maranhão',
+  'TJPI - TJ do Piauí',
+  'TRT-SP - TRT de São Paulo',
+  'TRT-RJ - TRT do Rio de Janeiro',
+  'TRT-MG - TRT de Minas Gerais',
+  'TRF1 - TRF da 1ª Região',
+  'TRF2 - TRF da 2ª Região',
+  'TRF3 - TRF da 3ª Região',
+  'TRF4 - TRF da 4ª Região',
+  'TRF5 - TRF da 5ª Região',
+  'Outro',
+]
+
 export default function ProcessosPage() {
   const queryClient = useQueryClient()
   const [statusFilter, setStatusFilter] = useState<ProcessStatus | ''>('')
@@ -131,44 +177,43 @@ export default function ProcessosPage() {
       ) : !processes?.length ? (
         <EmptyState message="Nenhum processo encontrado." />
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-zinc-800/50 bg-zinc-900/50">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-zinc-800/50 bg-zinc-900/80">
-                  <th className="text-left px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Número</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Cliente</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Tipo de Ação</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Tribunal</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Status</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Criado em</th>
-                  <th className="text-right px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {processes.map((proc) => (
-                  <tr key={proc.id} className="border-b border-zinc-800/30 table-row-hover">
-                    <td className="px-6 py-3.5 text-sm font-mono font-medium text-white">{proc.numero}</td>
-                    <td className="px-6 py-3.5 text-sm text-zinc-300">{proc.cliente_nome || '—'}</td>
-                    <td className="px-6 py-3.5 text-sm text-zinc-400">{proc.tipo_acao || '—'}</td>
-                    <td className="px-6 py-3.5 text-sm text-zinc-400">{proc.tribunal || '—'}</td>
-                    <td className="px-6 py-3.5"><StatusBadge status={proc.status} /></td>
-                    <td className="px-6 py-3.5 text-sm text-zinc-500">{formatDate(proc.created_at)}</td>
-                    <td className="px-6 py-3.5 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => openEdit(proc)} className="p-2 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-gold-400 transition-colors">
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button onClick={() => setDeleteId(proc.id)} className="p-2 rounded-lg text-zinc-400 hover:bg-red-500/10 hover:text-red-400 transition-colors">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {processes.map((proc) => (
+            <div key={proc.id} className="relative flex flex-col rounded-2xl border border-zinc-800/80 bg-[#121212] p-6 hover:border-gold-500/50 transition-colors duration-300 shadow-sm group">
+              <div className="flex justify-between items-start mb-4 gap-4">
+                <div className="flex flex-col overflow-hidden">
+                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Número do Processo</span>
+                  <span className="text-sm font-mono font-medium text-zinc-100 truncate">{proc.numero}</span>
+                </div>
+                <StatusBadge status={proc.status} />
+              </div>
+              
+              <div className="flex flex-col gap-4 mb-6 flex-1">
+                <div>
+                  <span className="block text-xs font-medium text-zinc-500 mb-1">Cliente</span>
+                  <span className="text-sm font-medium text-zinc-200">{proc.cliente_nome || '—'}</span>
+                </div>
+                <div>
+                  <span className="block text-xs font-medium text-zinc-500 mb-1">Ação / Tribunal</span>
+                  <span className="text-sm text-zinc-400 leading-snug">{proc.tipo_acao || '—'}<br/>{proc.tribunal || '—'}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-4 border-t border-zinc-800/60 mt-auto">
+                <span className="text-xs text-zinc-500 font-medium">
+                  Criado em {formatDate(proc.created_at)}
+                </span>
+                <div className="flex gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
+                  <button onClick={() => openEdit(proc)} className="p-2 rounded-lg text-zinc-400 hover:bg-[#1A1A1A] hover:text-gold-400 transition-colors">
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button onClick={() => setDeleteId(proc.id)} className="p-2 rounded-lg text-zinc-400 hover:bg-red-500/10 hover:text-red-400 transition-colors">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -178,13 +223,33 @@ export default function ProcessosPage() {
           <Input id="numero" label="Número do Processo *" value={formData.numero} onChange={(e) => setFormData({ ...formData, numero: e.target.value })} required />
           <div>
             <label className="block text-sm font-medium text-zinc-300 mb-1.5">Cliente *</label>
-            <select value={formData.client_id} onChange={(e) => setFormData({ ...formData, client_id: e.target.value })} required className="w-full rounded-xl border border-zinc-700 bg-zinc-800/50 px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-gold-500">
+            <select value={formData.client_id} onChange={(e) => setFormData({ ...formData, client_id: e.target.value })} required className="w-full h-11 rounded-xl border border-zinc-800 bg-[#121212] px-4 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-gold-500/50 focus:border-gold-500 transition-all duration-300">
               <option value="">Selecione um cliente</option>
               {clients.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
             </select>
           </div>
-          <Input id="tipo_acao" label="Tipo de Ação" value={formData.tipo_acao || ''} onChange={(e) => setFormData({ ...formData, tipo_acao: e.target.value })} />
-          <Input id="tribunal" label="Tribunal" value={formData.tribunal || ''} onChange={(e) => setFormData({ ...formData, tribunal: e.target.value })} />
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-zinc-300">Tipo de Ação</label>
+            <select
+              value={formData.tipo_acao || ''}
+              onChange={(e) => setFormData({ ...formData, tipo_acao: e.target.value })}
+              className="w-full h-11 rounded-xl border border-zinc-800 bg-[#121212] px-4 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-gold-500/50 focus:border-gold-500 transition-all duration-300"
+            >
+              <option value="">Selecione o tipo de ação</option>
+              {TIPOS_ACAO.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-zinc-300">Tribunal</label>
+            <select
+              value={formData.tribunal || ''}
+              onChange={(e) => setFormData({ ...formData, tribunal: e.target.value })}
+              className="w-full h-11 rounded-xl border border-zinc-800 bg-[#121212] px-4 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-gold-500/50 focus:border-gold-500 transition-all duration-300"
+            >
+              <option value="">Selecione o tribunal</option>
+              {TRIBUNAIS.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
           <Input id="parte_contraria" label="Parte Contrária" value={formData.parte_contraria || ''} onChange={(e) => setFormData({ ...formData, parte_contraria: e.target.value })} />
           {editingProcess && (
             <div className="space-y-1.5">
@@ -192,7 +257,7 @@ export default function ProcessosPage() {
               <select
                 value={formData.status || 'ativo'}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value as ProcessStatus })}
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-4 py-2.5 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-gold-500"
+                className="w-full h-11 rounded-xl border border-zinc-800 bg-[#121212] px-4 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-gold-500/50 focus:border-gold-500 transition-all duration-300"
               >
                 <option value="ativo">Ativo</option>
                 <option value="suspenso">Suspenso</option>

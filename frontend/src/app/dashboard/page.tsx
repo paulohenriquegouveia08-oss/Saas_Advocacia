@@ -47,7 +47,7 @@ export default function DashboardPage() {
         {statCards.map((card) => (
           <div
             key={card.key}
-            className="relative overflow-hidden rounded-2xl border border-zinc-800/50 bg-zinc-900/50 p-5 transition-all duration-300 hover:border-zinc-700/50 hover:shadow-lg group"
+            className="relative overflow-hidden rounded-2xl border border-zinc-800/80 bg-[#121212] p-5 transition-all duration-300 hover:border-gold-500/30 hover:shadow-lg group"
           >
             <div className="flex items-center justify-between">
               <div>
@@ -71,8 +71,8 @@ export default function DashboardPage() {
       </div>
 
       {/* Urgent Deadlines */}
-      <div className="rounded-2xl border border-zinc-800/50 bg-zinc-900/50 overflow-hidden">
-        <div className="flex items-center gap-3 px-6 py-4 border-b border-zinc-800/50">
+      <div className="rounded-2xl border border-zinc-800/80 bg-[#121212] overflow-hidden shadow-sm">
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-zinc-800/60 bg-[#1A1A1A]">
           <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-500/10">
             <TrendingUp className="h-4 w-4 text-red-400" />
           </div>
@@ -87,7 +87,7 @@ export default function DashboardPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-zinc-800/50">
+                <tr className="border-b border-zinc-800/60 bg-[#1A1A1A]">
                   <th className="text-left px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Processo</th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Descrição</th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">Vencimento</th>

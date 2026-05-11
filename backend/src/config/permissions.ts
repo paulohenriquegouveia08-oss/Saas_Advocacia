@@ -1,4 +1,4 @@
-export type UserRole = 'admin_global' | 'funcionario' | 'cliente'
+export type UserRole = 'admin_global' | 'funcionario'
 
 export type Permission =
   | 'users:create' | 'users:read' | 'users:update' | 'users:delete'
@@ -8,6 +8,7 @@ export type Permission =
   | 'deadlines:create' | 'deadlines:read' | 'deadlines:update' | 'deadlines:delete' | 'deadlines:complete'
   | 'notifications:read' | 'notifications:update'
   | 'financial:create' | 'financial:read' | 'financial:update' | 'financial:delete'
+  | 'settings:read' | 'settings:update'
 
 const ALL_PERMISSIONS: Permission[] = [
   'users:create', 'users:read', 'users:update', 'users:delete',
@@ -17,6 +18,7 @@ const ALL_PERMISSIONS: Permission[] = [
   'deadlines:create', 'deadlines:read', 'deadlines:update', 'deadlines:delete', 'deadlines:complete',
   'notifications:read', 'notifications:update',
   'financial:create', 'financial:read', 'financial:update', 'financial:delete',
+  'settings:read', 'settings:update',
 ]
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
@@ -29,12 +31,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'deadlines:create', 'deadlines:read', 'deadlines:update', 'deadlines:complete',
     'notifications:read', 'notifications:update',
     'financial:create', 'financial:read', 'financial:update',
-  ],
-
-  cliente: [
-    'processes:read',
-    'deadlines:read',
-    'notifications:read', 'notifications:update',
   ],
 }
 

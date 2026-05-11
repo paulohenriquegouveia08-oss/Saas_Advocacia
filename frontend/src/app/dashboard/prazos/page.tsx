@@ -59,15 +59,15 @@ export default function PrazosPage() {
       <PageHeader title="Prazos" description="Controle de prazos processuais" action={{ label: 'Novo Prazo', onClick: () => open() }} />
       <div className="flex gap-2 mb-6">
         {(['', 'pendente', 'atrasado', 'concluido'] as const).map((s) => (
-          <button key={s} onClick={() => setStatusFilter(s)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${statusFilter === s ? 'bg-gold-600/20 text-gold-400 border border-gold-500/30' : 'bg-zinc-800/50 text-zinc-400 border border-zinc-700/50 hover:bg-zinc-800'}`}>
+          <button key={s} onClick={() => setStatusFilter(s)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${statusFilter === s ? 'bg-gold-500/10 text-gold-500 border border-gold-500/30' : 'bg-[#121212] text-zinc-400 border border-zinc-800 hover:bg-[#1A1A1A]'}`}>
             {s === '' ? 'Todos' : s === 'concluido' ? 'Concluído' : s.charAt(0).toUpperCase() + s.slice(1)}
           </button>
         ))}
       </div>
       {isLoading ? <TableSkeleton rows={5} cols={6} /> : isError ? <ErrorState onRetry={refetch} /> : !data?.length ? <EmptyState message="Nenhum prazo encontrado." /> : (
-        <div className="overflow-hidden rounded-2xl border border-zinc-800/50 bg-zinc-900/50">
+        <div className="overflow-hidden rounded-2xl border border-zinc-800/80 bg-[#121212] shadow-sm">
           <table className="w-full">
-            <thead><tr className="border-b border-zinc-800/50 bg-zinc-900/80">
+            <thead><tr className="border-b border-zinc-800/60 bg-[#1A1A1A]">
               {['Processo','Descrição','Vencimento','Dias','Urgência','Status',''].map(h => <th key={h} className={`${h===''?'text-right':'text-left'} px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider`}>{h || 'Ações'}</th>)}
             </tr></thead>
             <tbody>{data.map((d) => (
@@ -80,7 +80,7 @@ export default function PrazosPage() {
                 <td className="px-6 py-3.5"><Badge variant={sv[d.status]}>{d.status === 'concluido' ? 'Concluído' : d.status.charAt(0).toUpperCase() + d.status.slice(1)}</Badge></td>
                 <td className="px-6 py-3.5 text-right"><div className="flex items-center justify-end gap-1">
                   {d.status !== 'concluido' && <button onClick={() => complete.mutate(d.id)} className="p-2 rounded-lg text-zinc-400 hover:bg-emerald-500/10 hover:text-emerald-400 transition-colors" title="Concluir"><CheckCircle className="h-4 w-4" /></button>}
-                  <button onClick={() => open(d)} className="p-2 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-gold-400 transition-colors"><Pencil className="h-4 w-4" /></button>
+                  <button onClick={() => open(d)} className="p-2 rounded-lg text-zinc-400 hover:bg-[#1A1A1A] hover:text-gold-400 transition-colors"><Pencil className="h-4 w-4" /></button>
                   <button onClick={() => setDeleteId(d.id)} className="p-2 rounded-lg text-zinc-400 hover:bg-red-500/10 hover:text-red-400 transition-colors"><Trash2 className="h-4 w-4" /></button>
                 </div></td>
               </tr>
@@ -92,7 +92,7 @@ export default function PrazosPage() {
         <form onSubmit={submit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-zinc-300 mb-1.5">Processo *</label>
-            <select value={form.process_id} onChange={e => setForm({ ...form, process_id: e.target.value })} required className="w-full rounded-xl border border-zinc-700 bg-zinc-800/50 px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-gold-500">
+            <select value={form.process_id} onChange={e => setForm({ ...form, process_id: e.target.value })} required className="w-full h-11 rounded-xl border border-zinc-800 bg-[#121212] px-4 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-gold-500/50 focus:border-gold-500 transition-all duration-300">
               <option value="">Selecione um processo</option>
               {processes.map(p => <option key={p.id} value={p.id}>{p.numero}</option>)}
             </select>

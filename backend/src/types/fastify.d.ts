@@ -9,6 +9,8 @@ declare module 'fastify' {
       role: UserRole
       ativo: boolean
       permissions: Permission[]
+      role_id?: string
+      role_name?: string
     }
   }
 }

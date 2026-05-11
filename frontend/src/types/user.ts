@@ -1,4 +1,4 @@
-export type UserRole = 'admin_global' | 'funcionario' | 'cliente'
+export type UserRole = 'admin_global' | 'funcionario'
 
 export interface User {
   id: string
@@ -7,6 +7,7 @@ export interface User {
   role: UserRole
   ativo: boolean
   created_at: string
+  telefone?: string | null
 }
 
 export interface CreateUserData {
@@ -21,4 +22,5 @@ export interface UpdateUserData {
   email?: string
   role?: UserRole
   ativo?: boolean
+  telefone?: string | null
 }

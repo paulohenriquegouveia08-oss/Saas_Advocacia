@@ -17,24 +17,35 @@ export class UserService {
   }
 
   async create(data: CreateUserInput) {
-    // Check if email already exists
+    // Check if email already exists in our database
     const existing = await this.repository.findByEmail(data.email)
     if (existing) throw ApiError.conflict('Email já cadastrado')
 
-    // Create user in Supabase Auth
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    // Try public signup first (more reliable with valid credentials)
+    const { data: signupData, error: signupError } = await supabaseAdmin.auth.signUp({
       email: data.email,
       password: data.senha,
-      email_confirm: true,
+      options: {
+        emailRedirectTo: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard`,
+        data: { nome: data.nome, role: data.role }
+      }
     })
 
-    if (authError || !authData.user) {
-      throw ApiError.internal(`Erro ao criar usuário no auth: ${authError?.message}`)
+    if (signupError) {
+      // If signup fails (e.g., email already in use), try to get the existing user
+      if (signupError.message.includes('already been registered')) {
+        throw ApiError.conflict('Email já está em uso. Utilize outro email.')
+      }
+      throw ApiError.internal(`Erro ao criar usuário: ${signupError.message}`)
+    }
+
+    if (!signupData.user) {
+      throw ApiError.internal('Erro ao criar usuário: usuário não foi criado')
     }
 
     // Create user in our database
     const user = await this.repository.create({
-      id: authData.user.id,
+      id: signupData.user.id,
       nome: data.nome,
       email: data.email,
       role: data.role,
@@ -54,6 +65,10 @@ export class UserService {
   async delete(id: string) {
     const existing = await this.repository.findById(id)
     if (!existing) throw ApiError.notFound('Usuário não encontrado')
+
+    if (existing.role === 'admin_global') {
+      throw ApiError.forbidden('Não é possível desativar o administrador global')
+    }
 
     // Deactivate instead of hard delete
     await this.repository.update(id, { ativo: false })

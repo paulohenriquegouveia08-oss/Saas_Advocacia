@@ -7,25 +7,26 @@ export interface UserRow {
   role: string
   ativo: boolean
   created_at: Date
+  telefone?: string | null
 }
 
 export class UserRepository {
   async findAll(): Promise<UserRow[]> {
     return query<UserRow>(
-      'SELECT id, nome, email, role, ativo, created_at FROM users ORDER BY created_at DESC'
+      'SELECT id, nome, email, role, ativo, created_at, telefone FROM users ORDER BY created_at DESC'
     )
   }
 
   async findById(id: string): Promise<UserRow | null> {
     return queryOne<UserRow>(
-      'SELECT id, nome, email, role, ativo, created_at FROM users WHERE id = $1',
+      'SELECT id, nome, email, role, ativo, created_at, telefone FROM users WHERE id = $1',
       [id]
     )
   }
 
   async findByEmail(email: string): Promise<UserRow | null> {
     return queryOne<UserRow>(
-      'SELECT id, nome, email, role, ativo, created_at FROM users WHERE email = $1',
+      'SELECT id, nome, email, role, ativo, created_at, telefone FROM users WHERE email = $1',
       [email]
     )
   }
@@ -40,7 +41,7 @@ export class UserRepository {
     return result!
   }
 
-  async update(id: string, data: { nome?: string; role?: string; ativo?: boolean }): Promise<UserRow | null> {
+  async update(id: string, data: { nome?: string; role?: string; ativo?: boolean; telefone?: string | null }): Promise<UserRow | null> {
     const fields: string[] = []
     const values: any[] = []
     let idx = 1
@@ -48,13 +49,14 @@ export class UserRepository {
     if (data.nome !== undefined) { fields.push(`nome = $${idx++}`); values.push(data.nome) }
     if (data.role !== undefined) { fields.push(`role = $${idx++}`); values.push(data.role) }
     if (data.ativo !== undefined) { fields.push(`ativo = $${idx++}`); values.push(data.ativo) }
+    if (data.telefone !== undefined) { fields.push(`telefone = $${idx++}`); values.push(data.telefone) }
 
     if (fields.length === 0) return this.findById(id)
 
     values.push(id)
     return queryOne<UserRow>(
       `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx}
-       RETURNING id, nome, email, role, ativo, created_at`,
+       RETURNING id, nome, email, role, ativo, created_at, telefone`,
       values
     )
   }
