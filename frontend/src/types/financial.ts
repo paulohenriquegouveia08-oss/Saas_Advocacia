@@ -28,7 +28,15 @@ export interface CreateFinancialData {
   client_id?: string | null
 }
 
-export interface UpdateFinancialData extends Partial<CreateFinancialData> {}
+export interface UpdateFinancialData {
+  tipo?: FinancialType
+  descricao?: string
+  valor?: number
+  categoria?: string
+  status?: string
+  data?: string
+  client_id?: string | null
+}
 
 export interface FinancialQuery {
   tipo?: FinancialType

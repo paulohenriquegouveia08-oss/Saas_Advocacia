@@ -1,6 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify'
 import { SettingsService } from './settings.service'
 import { settingsSchema, userPreferencesSchema } from './settings.schema'
+import { AuthUser } from '../../middlewares/auth.middleware'
 
 const service = new SettingsService()
 
@@ -17,15 +18,15 @@ export class SettingsController {
   }
 
   async getUserPreferences(request: FastifyRequest, reply: FastifyReply) {
-    const userId = request.user.id
-    const prefs = await service.getUserPreferences(userId)
+    const user = request.user as AuthUser
+    const prefs = await service.getUserPreferences(user.id)
     return reply.send(prefs)
   }
 
   async updateUserPreferences(request: FastifyRequest, reply: FastifyReply) {
-    const userId = request.user.id
+    const user = request.user as AuthUser
     const data = userPreferencesSchema.parse(request.body)
-    const prefs = await service.updateUserPreferences(userId, data)
+    const prefs = await service.updateUserPreferences(user.id, data)
     return reply.send(prefs)
   }
 }

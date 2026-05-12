@@ -1,25 +1,53 @@
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
 
-export function proxy(request: NextRequest) {
-  const token = request.cookies.get('access_token')?.value
+export async function proxy(request: NextRequest) {
+  const response = NextResponse.next()
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          request.cookies.set(name, value)
+          response.cookies.set(name, value, options)
+        },
+        remove(name: string, options: CookieOptions) {
+          request.cookies.set(name, '')
+          response.cookies.set(name, '', options)
+        },
+      },
+    }
+  )
+
+  const { data: { session } } = await supabase.auth.getSession()
   const { pathname } = request.nextUrl
 
-  // Protected dashboard routes
-  if (pathname.startsWith('/dashboard') || pathname === '/') {
-    if (!token) {
-      return NextResponse.redirect(new URL('/login', request.url))
-    }
-  }
-
-  // Redirect authenticated users away from login
-  if (pathname === '/login' && token) {
+  if (pathname === '/login' && session) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  return NextResponse.next()
+  if (pathname === '/' && session) {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
+
+  if (pathname === '/login' && !session) {
+    return response
+  }
+
+  if (pathname.startsWith('/dashboard') && !session) {
+    const loginUrl = new URL('/login', request.url)
+    loginUrl.searchParams.set('redirect', pathname)
+    return NextResponse.redirect(loginUrl)
+  }
+
+  return response
 }
 
 export const config = {
-  matcher: ['/', '/dashboard/:path*', '/login'],
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
 }

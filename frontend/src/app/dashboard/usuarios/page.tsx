@@ -1,10 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { toast } from '@/lib/toast'
-import { getSupabase } from '@/lib/auth'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { TableSkeleton } from '@/components/shared/TableSkeleton'
 import { ErrorState } from '@/components/shared/ErrorState'
@@ -13,8 +12,10 @@ import { Modal, ConfirmModal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
-import { Pencil, Trash2, Plus, Shield, ShieldCheck, User as UserIcon } from 'lucide-react'
+import { Pencil, Trash2, Plus, Shield, ShieldCheck, User as UserIcon, type LucideIcon } from 'lucide-react'
 import type { User, CreateUserData, UserRole } from '@/types/user'
+import { useUser } from '@/hooks/useUser'
+import { PermissionGuard } from '@/components/PermissionGuard'
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr)
@@ -24,17 +25,17 @@ function formatDate(dateStr: string): string {
   return `${day}/${month}/${year}`
 }
 
-const ROLES: { value: UserRole; label: string; icon: any; description: string }[] = [
+const ROLES: { value: UserRole; label: string; icon: LucideIcon; description: string }[] = [
   { value: 'admin_global', label: 'Administrador Global', icon: ShieldCheck, description: 'Acesso total ao sistema' },
   { value: 'funcionario', label: 'Funcionário', icon: Shield, description: 'Acesso limitado sem gerenciamento de usuários' },
 ]
 
 export default function UsuariosPage() {
   const queryClient = useQueryClient()
+  const { hasPermission } = useUser()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
-  const [currentUserRole, setCurrentUserRole] = useState<UserRole | null>(null)
 
   const [formData, setFormData] = useState<CreateUserData>({
     nome: '',
@@ -43,10 +44,9 @@ export default function UsuariosPage() {
     senha: '',
   })
 
-  const isAdmin = currentUserRole === 'admin_global'
-
-  // Debug - показываем кнопку siempre для pruebas
-  const showButton = true
+  const canCreate = hasPermission('users:create')
+  const canUpdate = hasPermission('users:update')
+  const canDelete = hasPermission('users:delete')
 
   const { data: response, isLoading, isError, refetch } = useQuery({
     queryKey: ['users'],
@@ -133,7 +133,7 @@ export default function UsuariosPage() {
       <PageHeader 
         title="Usuários" 
         description="Gerencie usuários do sistema" 
-        action={showButton ? { label: 'Novo Usuário', onClick: openCreate } : undefined} 
+        action={canCreate ? { label: 'Novo Usuário', onClick: openCreate } : undefined} 
       />
 
       {/* Table */}
@@ -179,20 +179,24 @@ export default function UsuariosPage() {
                       {user.created_at ? formatDate(user.created_at) : '-'}
                     </td>
                     <td className="px-6 py-3.5 text-right">
-                      {showButton && user.role !== 'admin_global' && (
+                      {(canUpdate || canDelete) && user.role !== 'admin_global' && (
                         <div className="flex items-center justify-end gap-1">
-                          <button 
-                            onClick={() => openEdit(user)} 
-                            className="p-2 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-gold-400 transition-colors"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button 
-                            onClick={() => setDeleteId(user.id)} 
-                            className="p-2 rounded-lg text-zinc-400 hover:bg-red-500/10 hover:text-red-400 transition-colors"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {canUpdate && (
+                            <button 
+                              onClick={() => openEdit(user)} 
+                              className="p-2 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-gold-400 transition-colors"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button 
+                              onClick={() => setDeleteId(user.id)} 
+                              className="p-2 rounded-lg text-zinc-400 hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       )}
                     </td>
@@ -256,7 +260,7 @@ export default function UsuariosPage() {
                     checked={formData.role === role.value}
                     onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
                     className="sr-only"
-                    disabled={editingUser && role.value === 'admin_global'}
+                    disabled={!!editingUser && role.value === 'admin_global'}
                   />
                   <role.icon className={`h-5 w-5 ${formData.role === role.value ? 'text-gold-500' : 'text-zinc-500'}`} />
                   <div className="flex-1">

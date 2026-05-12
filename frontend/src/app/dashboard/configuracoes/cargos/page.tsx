@@ -8,7 +8,8 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { Modal, ConfirmModal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-import { Shield, Pencil, Trash2, Users } from 'lucide-react'
+import { Shield, Pencil, Trash2, Users, ArrowLeft } from 'lucide-react'
+import Link from 'next/link'
 import type { Role, Permission, CreateRoleData } from '@/types/role'
 
 export default function CargosPage() {
@@ -68,6 +69,15 @@ export default function CargosPage() {
 
   return (
     <div className="animate-fade-in">
+      <div className="flex items-center justify-between mb-6">
+        <Link
+          href="/dashboard/configuracoes"
+          className="flex items-center gap-2 text-sm text-zinc-400 hover:text-gold-400 transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Voltar para Configurações
+        </Link>
+      </div>
       <PageHeader
         title="Gerenciamento de Cargos"
         description="Defina papéis e permissões granulares para acesso ao sistema."

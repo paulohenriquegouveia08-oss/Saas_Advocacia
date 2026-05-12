@@ -14,19 +14,34 @@ import {
   UserCog,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useUser } from '@/hooks/useUser'
+import type { Permission } from '@/hooks/useUser'
 
-const menuItems = [
+interface MenuItem {
+  href: string
+  label: string
+  icon: typeof LayoutDashboard
+  permission?: Permission
+}
+
+const menuItems: MenuItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/dashboard/clientes', label: 'Clientes', icon: Users },
-  { href: '/dashboard/processos', label: 'Processos', icon: Scale },
-  { href: '/dashboard/prazos', label: 'Prazos', icon: Clock },
-  { href: '/dashboard/financeiro', label: 'Financeiro', icon: DollarSign },
-  { href: '/dashboard/notificacoes', label: 'Notificações', icon: Bell },
-  { href: '/dashboard/usuarios', label: 'Usuários', icon: UserCog },
+  { href: '/dashboard/clientes', label: 'Clientes', icon: Users, permission: 'clients:read' },
+  { href: '/dashboard/processos', label: 'Processos', icon: Scale, permission: 'processes:read' },
+  { href: '/dashboard/prazos', label: 'Prazos', icon: Clock, permission: 'deadlines:read' },
+  { href: '/dashboard/financeiro', label: 'Financeiro', icon: DollarSign, permission: 'financial:read' },
+  { href: '/dashboard/notificacoes', label: 'Notificações', icon: Bell, permission: 'notifications:read' },
+  { href: '/dashboard/usuarios', label: 'Usuários', icon: UserCog, permission: 'users:read' },
 ]
 
 export function Sidebar() {
   const pathname = usePathname()
+  const { hasPermission } = useUser()
+
+  const visibleItems = menuItems.filter(item => {
+    if (!item.permission) return true
+    return hasPermission(item.permission)
+  })
 
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-zinc-800/80 bg-[#0B0B0B] flex flex-col">
@@ -43,7 +58,7 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto">
-        {menuItems.map((item) => {
+        {visibleItems.map((item) => {
           const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
           return (
             <Link
@@ -66,16 +81,18 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="border-t border-zinc-800/50 p-3">
-        <Link
-          href="/dashboard/configuracoes"
-          className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300 transition-all duration-200"
-        >
-          <Settings className="h-5 w-5" />
-          Configurações
-        </Link>
-      </div>
+      {/* Footer - só quem tem permissão de settings */}
+      {hasPermission('settings:read') && (
+        <div className="border-t border-zinc-800/50 p-3">
+          <Link
+            href="/dashboard/configuracoes"
+            className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300 transition-all duration-200"
+          >
+            <Settings className="h-5 w-5" />
+            Configurações
+          </Link>
+        </div>
+      )}
     </aside>
   )
 }

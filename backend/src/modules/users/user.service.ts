@@ -2,6 +2,7 @@ import { UserRepository } from './user.repository'
 import { CreateUserInput, UpdateUserInput } from './user.schema'
 import { supabaseAdmin } from '../../config/supabase'
 import { ApiError } from '../../utils/api-error'
+import { query } from '../../config/database'
 
 export class UserService {
   private repository = new UserRepository()
@@ -17,23 +18,20 @@ export class UserService {
   }
 
   async create(data: CreateUserInput) {
-    // Check if email already exists in our database
     const existing = await this.repository.findByEmail(data.email)
     if (existing) throw ApiError.conflict('Email já cadastrado')
 
-    // Try public signup first (more reliable with valid credentials)
-    const { data: signupData, error: signupError } = await supabaseAdmin.auth.signUp({
+    const { data: signupData, error: signupError } = await supabaseAdmin.auth.admin.createUser({
       email: data.email,
       password: data.senha,
-      options: {
-        emailRedirectTo: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard`,
-        data: { nome: data.nome, role: data.role }
-      }
+      email_confirm: true,
+      user_metadata: { nome: data.nome, role: data.role }
     })
 
     if (signupError) {
-      // If signup fails (e.g., email already in use), try to get the existing user
-      if (signupError.message.includes('already been registered')) {
+      if (signupError.message.includes('already been registered') || 
+          signupError.message.includes('already exists') ||
+          signupError.message.includes('Invalid')) {
         throw ApiError.conflict('Email já está em uso. Utilize outro email.')
       }
       throw ApiError.internal(`Erro ao criar usuário: ${signupError.message}`)
@@ -43,13 +41,29 @@ export class UserService {
       throw ApiError.internal('Erro ao criar usuário: usuário não foi criado')
     }
 
-    // Create user in our database
     const user = await this.repository.create({
       id: signupData.user.id,
       nome: data.nome,
       email: data.email,
       role: data.role,
     })
+
+    // Vincular automaticamente ao cargo baseado no role
+    try {
+      const roleResult = await query<{ id: string }>(
+        'SELECT id FROM roles WHERE nome = $1 LIMIT 1',
+        [data.role]
+      )
+      
+      if (roleResult.length > 0) {
+        await query(
+          'INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+          [signupData.user.id, roleResult[0].id]
+        )
+      }
+    } catch (err) {
+      console.warn('Erro ao vincular usuário ao cargo:', err)
+    }
 
     return user
   }

@@ -34,7 +34,7 @@ export class SettingsRepository {
     if (!settings) {
       settings = await queryOne<SettingsRow>(
         `INSERT INTO settings (escritorio_nome) VALUES ('Meu Escritório') RETURNING *`
-      )!
+      ) as SettingsRow
     }
     return settings
   }
@@ -88,17 +88,19 @@ export class SettingsRepository {
 
       if (fields.length > 0) {
         values.push(userId)
-        return queryOne<UserPreferencesRow>(
+        const result = await queryOne<UserPreferencesRow>(
           `UPDATE user_preferences SET ${fields.join(', ')} WHERE user_id = $${idx} RETURNING *`,
           values
-        )!
+        )
+        return result as UserPreferencesRow
       }
       return existing
     }
 
-    return queryOne<UserPreferencesRow>(
+    const result = await queryOne<UserPreferencesRow>(
       `INSERT INTO user_preferences (user_id, theme, notificacoes_email) VALUES ($1, $2, $3) RETURNING *`,
       [userId, data.theme || 'dark', data.notificacoes_email || false]
-    )!
+    )
+    return result as UserPreferencesRow
   }
 }

@@ -10,6 +10,7 @@ import { notificationRoutes } from './modules/notifications/notification.routes'
 import { financialRoutes } from './modules/financial/financial.routes'
 import { settingsRoutes } from './modules/settings/settings.routes'
 import { rolesRoutes } from './modules/roles/roles.routes'
+import { authRoutes } from './modules/auth/auth.routes'
 import { startDeadlineNotificationJob } from './jobs/deadline-notifications.job'
 import { pool } from './config/database'
 
@@ -32,6 +33,167 @@ async function bootstrap() {
   // Health check
   app.get('/health', async () => {
     return { status: 'ok', timestamp: new Date().toISOString() }
+  })
+
+  // Setup de tabelas de roles e permissions (executar uma vez)
+  app.post('/setup/roles', async (request, reply) => {
+    const { pool } = await import('./config/database')
+
+    try {
+      // Verificar se já existe
+      const exists = await pool.query(`
+        SELECT table_name FROM information_schema.tables 
+        WHERE table_name = 'permissions' LIMIT 1
+      `)
+      if (exists.rows.length > 0) {
+        return reply.send({ message: 'Tabelas de roles já existem' })
+      }
+
+      // Criar roles
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS roles (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          nome TEXT UNIQUE NOT NULL,
+          descricao TEXT,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `)
+
+      // Criar permissions
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS permissions (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          nome TEXT NOT NULL,
+          chave TEXT UNIQUE NOT NULL,
+          grupo TEXT NOT NULL
+        )
+      `)
+
+      // Criar user_roles
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS user_roles (
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+          PRIMARY KEY (user_id, role_id)
+        )
+      `)
+
+      // Criar role_permissions
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS role_permissions (
+          role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+          permission_id UUID NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
+          PRIMARY KEY (role_id, permission_id)
+        )
+      `)
+
+      // Inserir permissions padrão
+      await pool.query(`
+        INSERT INTO permissions (nome, chave, grupo) VALUES
+        ('Criar usuários', 'users:create', 'Usuários'),
+        ('Listar usuários', 'users:read', 'Usuários'),
+        ('Editar usuários', 'users:update', 'Usuários'),
+        ('Excluir usuários', 'users:delete', 'Usuários'),
+        ('Criar clientes', 'clients:create', 'Clientes'),
+        ('Listar clientes', 'clients:read', 'Clientes'),
+        ('Editar clientes', 'clients:update', 'Clientes'),
+        ('Excluir clientes', 'clients:delete', 'Clientes'),
+        ('Criar processos', 'processes:create', 'Processos'),
+        ('Listar processos', 'processes:read', 'Processos'),
+        ('Editar processos', 'processes:update', 'Processos'),
+        ('Excluir processos', 'processes:delete', 'Processos'),
+        ('Criar movimentos', 'movements:create', 'Movimentos'),
+        ('Listar movimentos', 'movements:read', 'Movimentos'),
+        ('Criar prazos', 'deadlines:create', 'Prazos'),
+        ('Listar prazos', 'deadlines:read', 'Prazos'),
+        ('Editar prazos', 'deadlines:update', 'Prazos'),
+        ('Excluir prazos', 'deadlines:delete', 'Prazos'),
+        ('Concluir prazos', 'deadlines:complete', 'Prazos'),
+        ('Listar notificações', 'notifications:read', 'Notificações'),
+        ('Atualizar notificações', 'notifications:update', 'Notificações'),
+        ('Criar transação', 'financial:create', 'Financeiro'),
+        ('Listar transações', 'financial:read', 'Financeiro'),
+        ('Editar transação', 'financial:update', 'Financeiro'),
+        ('Excluir transação', 'financial:delete', 'Financeiro'),
+        ('Ver configurações', 'settings:read', 'Configurações'),
+        ('Editar configurações', 'settings:update', 'Configurações')
+        ON CONFLICT (chave) DO NOTHING
+      `)
+
+      // Inserir roles padrão
+      await pool.query(`
+        INSERT INTO roles (nome, descricao) VALUES
+        ('admin_global', 'Acesso total ao sistema'),
+        ('funcionario', 'Acesso limitado sem gerenciamento de usuários'),
+        ('cliente', 'Acesso apenas para visualizar seus processos e prazos')
+        ON CONFLICT (nome) DO NOTHING
+      `)
+
+      // Vincular todas permissões ao admin_global
+      await pool.query(`
+        INSERT INTO role_permissions (role_id, permission_id)
+        SELECT r.id, p.id FROM roles r, permissions p WHERE r.nome = 'admin_global'
+        ON CONFLICT DO NOTHING
+      `)
+
+      // Vincular permissões de funcionário
+      await pool.query(`
+        INSERT INTO role_permissions (role_id, permission_id)
+        SELECT r.id, p.id FROM roles r, permissions p 
+        WHERE r.nome = 'funcionario' AND p.chave IN (
+          'clients:create', 'clients:read', 'clients:update',
+          'processes:create', 'processes:read', 'processes:update',
+          'movements:create', 'movements:read',
+          'deadlines:create', 'deadlines:read', 'deadlines:update', 'deadlines:complete',
+          'notifications:read', 'notifications:update',
+          'financial:create', 'financial:read', 'financial:update'
+        )
+        ON CONFLICT DO NOTHING
+      `)
+
+      // Vincular permissões de cliente
+      await pool.query(`
+        INSERT INTO role_permissions (role_id, permission_id)
+        SELECT r.id, p.id FROM roles r, permissions p 
+        WHERE r.nome = 'cliente' AND p.chave IN (
+          'processes:read', 'deadlines:read', 'notifications:read'
+        )
+        ON CONFLICT DO NOTHING
+      `)
+
+      return reply.status(201).send({ message: 'Tabelas de roles e permissions criadas com sucesso!' })
+    } catch (error) {
+      console.error('Erro ao criar tabelas:', error)
+      return reply.status(500).send({ error: 'Erro ao criar tabelas', details: String(error) })
+    }
+  })
+
+  // Fix: vincular usuários existentes que não têm user_roles
+  app.post('/setup/fix-user-roles', async (request, reply) => {
+    const { pool } = await import('./config/database')
+
+    try {
+      // Buscar usuários sem vínculo em user_roles
+      const result = await pool.query(`
+        INSERT INTO user_roles (user_id, role_id)
+        SELECT u.id, r.id
+        FROM users u
+        JOIN roles r ON r.nome = u.role::text
+        WHERE NOT EXISTS (
+          SELECT 1 FROM user_roles ur WHERE ur.user_id = u.id
+        )
+        RETURNING user_id
+      `)
+
+      return reply.send({ 
+        message: `${result.rowCount} usuários vinculados aos seus cargos`,
+        fixed: result.rowCount
+      })
+    } catch (error) {
+      console.error('Erro ao corrigir user_roles:', error)
+      return reply.status(500).send({ error: 'Erro ao corrigir', details: String(error) })
+    }
   })
 
   // Setup inicial - cria primeiro admin (só funciona se não existir nenhum usuário)
@@ -153,6 +315,7 @@ async function bootstrap() {
   await app.register(financialRoutes)
   await app.register(settingsRoutes)
   await app.register(rolesRoutes, { prefix: '/roles' })
+  await app.register(authRoutes)
 
   // Start notification cron job
   startDeadlineNotificationJob()

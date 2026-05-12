@@ -25,7 +25,13 @@ export interface CreateClientData {
   status?: string
 }
 
-export interface UpdateClientData extends Partial<CreateClientData> {}
+export interface UpdateClientData {
+  nome?: string
+  cpf?: string
+  telefone?: string
+  email?: string
+  status?: string
+}
 
 export interface ClientQuery {
   search?: string

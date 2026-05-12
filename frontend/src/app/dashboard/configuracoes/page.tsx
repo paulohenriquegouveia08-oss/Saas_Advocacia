@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button'
 import { Building2, User, Users, Settings as SettingsIcon, Loader2, Save, Shield } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
+import { useUser } from '@/hooks/useUser'
 
 type Tab = 'perfil' | 'escritorio' | 'cargos'
 
@@ -26,11 +27,6 @@ interface Settings {
   dias_antecedencia?: number
 }
 
-interface UserPreferences {
-  theme: string
-  notificacoes_email: boolean
-}
-
 interface UserData {
   id: string
   nome: string
@@ -41,8 +37,8 @@ interface UserData {
 
 export default function ConfiguracoesPage() {
   const queryClient = useQueryClient()
+  const { user: currentUser, isLoading: userLoading, isAdmin } = useUser()
   const [activeTab, setActiveTab] = useState<Tab>('perfil')
-  const [currentUser, setCurrentUser] = useState<UserData | null>(null)
 
   const [perfilForm, setPerfilForm] = useState({
     nome: '',
@@ -59,32 +55,37 @@ export default function ConfiguracoesPage() {
     escritorio_endereco: '',
   })
 
-  useEffect(() => {
-    const getUser = async () => {
-      const supabase = getSupabase()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const userData = await api.get<UserData>('/users/' + user.id)
-        setCurrentUser({
-          id: userData.id,
-          nome: userData.nome,
-          email: userData.email,
-          role: userData.role,
-        })
-        setPerfilForm(p => ({
-          ...p,
-          nome: userData.nome,
-          telefone: userData.telefone || '',
-        }))
-      }
-    }
-    getUser()
-  }, [])
+  const { data: currentUserData, isLoading: loadingUserData } = useQuery({
+    queryKey: ['current-user-profile'],
+    queryFn: async () => {
+      if (!currentUser?.id) return null
+      return api.get<UserData>('/users/' + currentUser.id)
+    },
+    enabled: !!currentUser?.id,
+  })
+
+  const loadingUser = loadingUserData || userLoading || !currentUser?.id
 
   const { data: settings, isLoading: loadingSettings } = useQuery({
     queryKey: ['settings'],
     queryFn: () => api.get<Settings>('/settings'),
   })
+
+  useEffect(() => {
+    if (currentUserData?.data) {
+      setPerfilForm(p => ({
+        ...p,
+        nome: currentUserData.data.nome,
+        telefone: currentUserData.data.telefone || '',
+      }))
+    } else if (currentUser) {
+      setPerfilForm(p => ({
+        ...p,
+        nome: currentUser.nome,
+        telefone: '',
+      }))
+    }
+  }, [currentUserData, currentUser])
 
   useEffect(() => {
     if (settings) {
@@ -95,6 +96,8 @@ export default function ConfiguracoesPage() {
   const updatePerfil = useMutation({
     mutationFn: async () => {
       const supabase = getSupabase()
+      
+      if (!currentUser) throw new Error('Usuário não encontrado')
       
       if (perfilForm.novaSenha && perfilForm.novaSenha !== perfilForm.confirmarSenha) {
         throw new Error('As senhas não conferem')
@@ -107,13 +110,13 @@ export default function ConfiguracoesPage() {
         if (error) throw new Error(error.message)
       }
 
-      await api.put('/users/' + currentUser?.id, {
+      await api.put('/users/' + currentUser.id, {
         nome: perfilForm.nome,
         telefone: perfilForm.telefone || null,
       })
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['current-user'] })
+      queryClient.invalidateQueries({ queryKey: ['current-user-profile'] })
       toast.success('Perfil atualizado!')
       setPerfilForm(p => ({ ...p, novaSenha: '', confirmarSenha: '' }))
     },
@@ -131,11 +134,22 @@ export default function ConfiguracoesPage() {
 
   const tabs = [
     { id: 'perfil' as Tab, label: 'Meu Perfil', icon: User },
-    { id: 'escritorio' as Tab, label: 'Dados do Escritório', icon: Building2, roles: ['admin_global'] },
-    { id: 'cargos' as Tab, label: 'Cargos e Permissões', icon: Shield, roles: ['admin_global'], href: '/dashboard/configuracoes/cargos' },
+    { id: 'escritorio' as Tab, label: 'Dados do Escritório', icon: Building2, adminOnly: true },
+    { id: 'cargos' as Tab, label: 'Cargos e Permissões', icon: Shield, adminOnly: true, href: '/dashboard/configuracoes/cargos' },
   ]
 
-  const filteredTabs = tabs.filter(t => !t.roles || (currentUser && t.roles.includes(currentUser.role)))
+  const filteredTabs = tabs.filter(t => !t.adminOnly || isAdmin)
+
+  if (loadingUser) {
+    return (
+      <div className="animate-fade-in">
+        <PageHeader title="Configurações" description="Gerencie suas preferências e dados do sistema" />
+        <div className="flex items-center justify-center py-24">
+          <Loader2 className="h-8 w-8 animate-spin text-gold-500" />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="animate-fade-in">
@@ -194,7 +208,7 @@ export default function ConfiguracoesPage() {
                 <Input
                   id="email"
                   label="Email"
-                  value={currentUser?.email || ''}
+                  value={currentUser?.email || currentUserData?.data?.email || ''}
                   disabled
                   className="opacity-60"
                 />

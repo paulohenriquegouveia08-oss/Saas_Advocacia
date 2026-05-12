@@ -30,7 +30,14 @@ export interface CreateProcessData {
   status?: ProcessStatus
 }
 
-export interface UpdateProcessData extends Partial<CreateProcessData> {}
+export interface UpdateProcessData {
+  client_id?: string
+  numero?: string
+  tribunal?: string
+  tipo_acao?: string
+  parte_contraria?: string
+  status?: ProcessStatus
+}
 
 export interface CreateMovementData {
   tipo?: string

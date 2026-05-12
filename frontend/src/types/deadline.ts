@@ -24,7 +24,13 @@ export interface CreateDeadlineData {
   responsavel_id?: string
 }
 
-export interface UpdateDeadlineData extends Partial<CreateDeadlineData> {}
+export interface UpdateDeadlineData {
+  process_id?: string
+  descricao?: string
+  data_inicio?: string
+  data_vencimento?: string
+  responsavel_id?: string
+}
 
 export interface DeadlineQuery {
   status?: DeadlineStatus
