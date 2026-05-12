@@ -14,7 +14,7 @@ import { authRoutes } from './modules/auth/auth.routes'
 import { startDeadlineNotificationJob } from './jobs/deadline-notifications.job'
 import { pool } from './config/database'
 
-async function bootstrap() {
+export async function createApp() {
   const app = Fastify({
     logger: {
       level: env.NODE_ENV === 'development' ? 'info' : 'warn',
@@ -328,25 +328,32 @@ async function bootstrap() {
     app.log.error(error as Error, '❌ Erro ao conectar com banco de dados')
   }
 
-  // Start server
-  try {
-    await app.listen({ port: env.PORT, host: env.HOST })
-    app.log.info(`🚀 Servidor rodando em http://${env.HOST}:${env.PORT}`)
-  } catch (err) {
-    app.log.error(err)
-    process.exit(1)
-  }
-
-  // Graceful shutdown
-  const signals = ['SIGINT', 'SIGTERM']
-  signals.forEach((signal) => {
-    process.on(signal, async () => {
-      app.log.info(`Received ${signal}, shutting down...`)
-      await app.close()
-      await pool.end()
-      process.exit(0)
-    })
-  })
+  return app
 }
 
-bootstrap()
+// Inicia o servidor apenas se executado diretamente (desenvolvimento local)
+if (require.main === module) {
+  async function start() {
+    const app = await createApp()
+    try {
+      await app.listen({ port: env.PORT, host: env.HOST })
+      console.log(`🚀 Servidor rodando em http://${env.HOST}:${env.PORT}`)
+    } catch (err) {
+      app.log.error(err)
+      process.exit(1)
+    }
+
+    // Graceful shutdown
+    const signals = ['SIGINT', 'SIGTERM'] as const
+    signals.forEach((signal) => {
+      process.on(signal, async () => {
+        app.log.info(`Received ${signal}, shutting down...`)
+        await app.close()
+        await pool.end()
+        process.exit(0)
+      })
+    })
+  }
+
+  start()
+}
