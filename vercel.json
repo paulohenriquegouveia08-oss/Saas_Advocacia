@@ -1,24 +1,15 @@
 {
   "version": 2,
   "name": "saas-advocacia",
-  "builds": [
-    {
-      "src": "backend/api/index.ts",
-      "use": "@vercel/node"
+  "experimentalServices": {
+    "frontend": {
+      "entrypoint": "frontend",
+      "routePrefix": "/",
+      "framework": "nextjs"
     },
-    {
-      "src": "frontend/package.json",
-      "use": "@vercel/next"
+    "backend": {
+      "entrypoint": "backend",
+      "routePrefix": "/api"
     }
-  ],
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/backend/api/index.ts"
-    },
-    {
-      "source": "/((?!api/).*)",
-      "destination": "/frontend/$1"
-    }
-  ]
+  }
 }
