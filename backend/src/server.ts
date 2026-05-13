@@ -23,7 +23,7 @@ export async function createApp() {
 
   // CORS
   await app.register(cors, {
-    origin: env.CORS_ORIGIN,
+    origin: env.NODE_ENV === 'production' ? true : env.CORS_ORIGIN,
     credentials: true,
   })
 
@@ -307,15 +307,16 @@ export async function createApp() {
   })
 
   // Register module routes
-  await app.register(userRoutes)
-  await app.register(clientRoutes)
-  await app.register(processRoutes)
-  await app.register(deadlineRoutes)
-  await app.register(notificationRoutes)
-  await app.register(financialRoutes)
-  await app.register(settingsRoutes)
-  await app.register(rolesRoutes, { prefix: '/roles' })
-  await app.register(authRoutes)
+  const apiPrefix = env.NODE_ENV === 'production' ? '/api' : ''
+  await app.register(userRoutes, { prefix: apiPrefix })
+  await app.register(clientRoutes, { prefix: apiPrefix })
+  await app.register(processRoutes, { prefix: apiPrefix })
+  await app.register(deadlineRoutes, { prefix: apiPrefix })
+  await app.register(notificationRoutes, { prefix: apiPrefix })
+  await app.register(financialRoutes, { prefix: apiPrefix })
+  await app.register(settingsRoutes, { prefix: apiPrefix })
+  await app.register(rolesRoutes, { prefix: apiPrefix + '/roles' })
+  await app.register(authRoutes, { prefix: apiPrefix })
 
   // Start notification cron job
   startDeadlineNotificationJob()
