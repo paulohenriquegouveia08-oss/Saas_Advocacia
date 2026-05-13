@@ -1,4 +1,5 @@
 import Fastify from 'fastify'
+import type { IncomingMessage, ServerResponse } from 'http'
 import cors from '@fastify/cors'
 import { env } from './config/env'
 import { errorHandler } from './middlewares/error-handler.middleware'
@@ -336,6 +337,33 @@ export async function createApp() {
   }
 
   return app
+}
+
+// ============================================================
+// Vercel experimentalServices: default export como handler
+// ============================================================
+let cachedApp: Awaited<ReturnType<typeof createApp>> | null = null
+
+async function getApp() {
+  if (!cachedApp) {
+    cachedApp = await createApp()
+    await cachedApp.ready()
+    console.log('[Vercel] Fastify app pronto')
+  }
+  return cachedApp
+}
+
+// Default export que a Vercel espera: (req, res) => void
+export default async function handler(req: IncomingMessage, res: ServerResponse) {
+  try {
+    const app = await getApp()
+    app.server.emit('request', req, res)
+  } catch (err) {
+    console.error('[Vercel] Erro no handler:', err)
+    res.statusCode = 500
+    res.setHeader('Content-Type', 'application/json')
+    res.end(JSON.stringify({ error: 'Erro interno do servidor', statusCode: 500 }))
+  }
 }
 
 // Inicia o servidor apenas se executado diretamente (desenvolvimento local)
