@@ -12,4 +12,12 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 })
 
-export const env = envSchema.parse(process.env)
+let env;
+try {
+  env = envSchema.parse(process.env);
+} catch (e) {
+  console.error('❌ ERRO NAS VARIÁVEIS DE AMBIENTE:', e.format());
+  // Em produção, vamos tentar não crashar imediatamente para ver o log
+  env = process.env as any; 
+}
+export { env };
