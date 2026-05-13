@@ -7,7 +7,8 @@ export function errorHandler(
   request: FastifyRequest,
   reply: FastifyReply
 ) {
-  request.log.error(error)
+  // Sempre logar via console.error para garantir visibilidade na Vercel
+  console.error(`[ERROR] ${request.method} ${request.url}:`, error.message, error.stack)
 
   // Zod validation errors
   if (error instanceof ZodError) {
@@ -39,9 +40,10 @@ export function errorHandler(
     })
   }
 
-  // Unknown errors
+  // Unknown errors — incluir mensagem real para diagnóstico
   return reply.status(500).send({
     error: 'Erro interno do servidor',
+    detail: error.message,
     statusCode: 500,
   })
 }
