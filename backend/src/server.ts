@@ -318,8 +318,14 @@ export async function createApp() {
   await app.register(rolesRoutes, { prefix: '/roles' })
   await app.register(authRoutes)
 
-  // Start notification cron job
-  startDeadlineNotificationJob()
+  // Start notification cron job (apenas em servidor persistente, não em serverless)
+  const isServerless = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME
+  if (!isServerless) {
+    startDeadlineNotificationJob()
+    app.log.info('✅ Cron job de notificações iniciado')
+  } else {
+    app.log.info('⏭️ Cron job ignorado (ambiente serverless)')
+  }
 
   // Verify database connection
   try {
