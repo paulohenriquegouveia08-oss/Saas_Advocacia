@@ -1,10 +1,9 @@
 import { Pool, QueryResult, QueryResultRow } from 'pg'
 import { env } from './env'
 
-// Configuração otimizada para Vercel + Supabase
 export const pool = new Pool({
   connectionString: env.DATABASE_URL,
-  max: 10, // Reduzido para evitar erro de muitas conexões
+  max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,
   ssl: env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
