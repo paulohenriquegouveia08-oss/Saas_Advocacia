@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { toast } from '@/lib/toast'
@@ -13,7 +13,7 @@ import { Modal, ConfirmModal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { StatusBadge } from '@/components/ui/Badge'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Pencil, Trash2, Search } from 'lucide-react'
 import type { Process, CreateProcessData, ProcessStatus } from '@/types/process'
 
 const TIPOS_ACAO = [
@@ -65,7 +65,16 @@ const TRIBUNAIS = [
 export default function ProcessosPage() {
   const queryClient = useQueryClient()
   const [statusFilter, setStatusFilter] = useState<ProcessStatus | ''>('')
+  const [searchInput, setSearchInput] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchInput])
   const [editingProcess, setEditingProcess] = useState<Process | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [formData, setFormData] = useState<CreateProcessData>({ client_id: '', numero: '' })
@@ -76,8 +85,14 @@ export default function ProcessosPage() {
   })
 
   const { data: response, isLoading, isError, refetch } = useQuery({
-    queryKey: ['processes', statusFilter],
-    queryFn: () => api.get<{ data: Process[], total: number }>('/processes', { status: statusFilter || undefined }),
+    queryKey: ['processes', statusFilter, debouncedSearch],
+    queryFn: () => api.get<{ data: Process[], total: number }>('/processes', {
+      status: statusFilter || undefined,
+      search: debouncedSearch || undefined,
+      page: 1,
+      limit: 20,
+    }),
+    staleTime: 0,
   })
   const processes = response?.data || []
 
@@ -151,6 +166,18 @@ export default function ProcessosPage() {
   return (
     <div className="animate-fade-in">
       <PageHeader title="Processos" description="Gerencie os processos judiciais" action={{ label: 'Novo Processo', onClick: openCreate }} />
+
+      {/* Search */}
+      <div className="relative mb-6 max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+        <input
+          type="text"
+          placeholder="Buscar por número, tribunal, tipo, cliente..."
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          className="w-full pl-10 pr-4 h-11 rounded-xl border border-zinc-800 bg-[#121212] text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-gold-500/50 focus:border-gold-500 transition-all duration-300"
+        />
+      </div>
 
       {/* Status filter */}
       <div className="flex gap-2 mb-6">

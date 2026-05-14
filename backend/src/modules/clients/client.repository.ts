@@ -30,8 +30,11 @@ export class ClientRepository {
       values
     )
 
+    const limitIdx = idx++
+    const offsetIdx = idx++
+
     const data = await query<ClientRow>(
-      `SELECT * FROM clients ${where} ORDER BY created_at DESC LIMIT $${idx} OFFSET $${idx + 1}`,
+      `SELECT * FROM clients ${where} ORDER BY created_at DESC LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
       [...values, params.limit, offset]
     )
 

@@ -36,52 +36,7 @@ export async function createApp() {
     return { status: 'ok', timestamp: new Date().toISOString() }
   })
 
-  // Diagnóstico — testar conexões (remover depois de estabilizar)
-  app.get('/debug/status', async (request, reply) => {
-    const results: Record<string, any> = {
-      timestamp: new Date().toISOString(),
-      env: {
-        NODE_ENV: env.NODE_ENV,
-        DATABASE_URL: env.DATABASE_URL ? '✅ definida (' + env.DATABASE_URL.substring(0, 30) + '...)' : '❌ não definida',
-        SUPABASE_URL: env.SUPABASE_URL ? '✅ definida' : '❌ não definida',
-        SUPABASE_ANON_KEY: env.SUPABASE_ANON_KEY ? '✅ definida' : '❌ não definida',
-        SUPABASE_SERVICE_ROLE_KEY: env.SUPABASE_SERVICE_ROLE_KEY ? '✅ definida' : '❌ não definida',
-      },
-    }
-
-    // Testar banco de dados
-    try {
-      const dbResult = await pool.query('SELECT NOW() as now, current_database() as db')
-      results.database = { status: '✅ conectado', ...dbResult.rows[0] }
-    } catch (err: any) {
-      results.database = { status: '❌ erro', message: err.message }
-    }
-
-    // Testar Supabase
-    try {
-      const { supabaseAdmin } = await import('./config/supabase')
-      const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1 })
-      results.supabase = error 
-        ? { status: '❌ erro', message: error.message }
-        : { status: '✅ conectado', usersFound: data.users.length }
-    } catch (err: any) {
-      results.supabase = { status: '❌ erro', message: err.message }
-    }
-
-    // Testar tabelas essenciais
-    try {
-      const tables = await pool.query(`
-        SELECT table_name FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-        ORDER BY table_name
-      `)
-      results.tables = tables.rows.map((r: any) => r.table_name)
-    } catch (err: any) {
-      results.tables = { error: err.message }
-    }
-
-    return reply.send(results)
-  })
+  
 
   // Setup de tabelas de roles e permissions (executar uma vez)
   app.post('/setup/roles', async (request, reply) => {

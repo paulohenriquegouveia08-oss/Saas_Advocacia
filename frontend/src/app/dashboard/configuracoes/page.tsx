@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { toast } from '@/lib/toast'
@@ -71,32 +71,27 @@ export default function ConfiguracoesPage() {
     queryFn: () => api.get<Settings>('/settings'),
   })
 
-  // React 19: adjust state during render instead of useEffect (avoids cascading renders)
-  const [prevUserData, setPrevUserData] = useState(currentUserData)
-  if (currentUserData !== prevUserData) {
-    setPrevUserData(currentUserData)
+  useEffect(() => {
     if (currentUserData?.data) {
       setPerfilForm(p => ({
         ...p,
-        nome: currentUserData.data.nome,
+        nome: currentUserData.data.nome || '',
         telefone: currentUserData.data.telefone || '',
       }))
-    } else if (currentUser) {
+    } else if (currentUser?.nome && !currentUserData?.data) {
       setPerfilForm(p => ({
         ...p,
         nome: currentUser.nome,
         telefone: '',
       }))
     }
-  }
+  }, [currentUserData, currentUser])
 
-  const [prevSettings, setPrevSettings] = useState(settings)
-  if (settings !== prevSettings) {
-    setPrevSettings(settings)
+  useEffect(() => {
     if (settings) {
       setEscritorioForm(s => ({ ...s, ...settings }))
     }
-  }
+  }, [settings])
 
   const updatePerfil = useMutation({
     mutationFn: async () => {

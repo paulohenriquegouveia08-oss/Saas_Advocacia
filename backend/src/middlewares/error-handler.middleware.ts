@@ -40,10 +40,9 @@ export function errorHandler(
     })
   }
 
-  // Unknown errors — incluir mensagem real para diagnóstico
+  // Unknown errors — ocultar detalhes em produção por segurança
   return reply.status(500).send({
     error: 'Erro interno do servidor',
-    detail: error.message,
     statusCode: 500,
   })
 }

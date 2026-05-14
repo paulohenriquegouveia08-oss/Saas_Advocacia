@@ -22,7 +22,7 @@ export interface MovementRow {
 }
 
 export class ProcessRepository {
-  async findAll(params: { status?: string; client_id?: string; page: number; limit: number }): Promise<{ data: ProcessRow[]; total: number }> {
+  async findAll(params: { status?: string; client_id?: string; search?: string; page: number; limit: number }): Promise<{ data: ProcessRow[]; total: number }> {
     const offset = (params.page - 1) * params.limit
     const conditions: string[] = []
     const values: any[] = []
@@ -36,13 +36,22 @@ export class ProcessRepository {
       conditions.push(`p.client_id = $${idx++}`)
       values.push(params.client_id)
     }
+    if (params.search) {
+      conditions.push(`(p.numero ILIKE $${idx} OR p.tribunal ILIKE $${idx} OR p.tipo_acao ILIKE $${idx} OR p.parte_contraria ILIKE $${idx} OR c.nome ILIKE $${idx})`)
+      values.push(`%${params.search}%`)
+      idx++
+    }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+    console.log('[DEBUG] WHERE:', where, '| VALUES:', values)
 
     const total = await queryCount(
-      `SELECT COUNT(*) FROM processes p ${where}`,
+      `SELECT COUNT(*) FROM processes p JOIN clients c ON p.client_id = c.id ${where}`,
       values
     )
+
+    const limitIdx = idx++
+    const offsetIdx = idx++
 
     const data = await query<ProcessRow>(
       `SELECT p.*, c.nome AS cliente_nome
@@ -50,7 +59,7 @@ export class ProcessRepository {
        JOIN clients c ON p.client_id = c.id
        ${where}
        ORDER BY p.created_at DESC
-       LIMIT $${idx} OFFSET $${idx + 1}`,
+       LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
       [...values, params.limit, offset]
     )
 

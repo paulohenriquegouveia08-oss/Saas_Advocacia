@@ -21,6 +21,7 @@ export const updateProcessSchema = z.object({
 export const processQuerySchema = z.object({
   status: z.enum(['ativo', 'suspenso', 'encerrado']).optional(),
   client_id: z.string().uuid().optional(),
+  search: z.string().optional(),
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(20),
 })

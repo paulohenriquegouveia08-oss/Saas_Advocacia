@@ -6,6 +6,7 @@ import { api } from '@/lib/api'
 import { signOut } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { useUser } from '@/hooks/useUser'
 
 interface Settings {
   escritorio_nome: string | null
@@ -14,6 +15,7 @@ interface Settings {
 
 export function Topbar() {
   const router = useRouter()
+  const { user } = useUser()
 
   const { data: unreadCount } = useQuery({
     queryKey: ['notifications', 'unread-count'],
@@ -44,6 +46,9 @@ export function Topbar() {
           <div className="flex flex-col">
             <span className="text-sm font-semibold text-zinc-100">
               {settings?.escritorio_nome || 'Meu Escritório'}
+              {user?.nome && (
+                <span className="text-zinc-500 font-normal"> — {user.nome}</span>
+              )}
             </span>
             {settings?.escritorio_cnpj && (
               <span className="text-xs text-zinc-500 font-mono">
