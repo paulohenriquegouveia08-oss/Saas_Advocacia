@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { signOut } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
-import { cn } from '@/lib/utils'
+import { cn, formatCNPJ } from '@/lib/utils'
 import { useUser } from '@/hooks/useUser'
 
 interface Settings {
@@ -52,11 +52,12 @@ export function Topbar() {
             </span>
             {settings?.escritorio_cnpj && (
               <span className="text-xs text-zinc-500 font-mono">
-                {settings.escritorio_cnpj}
+                {formatCNPJ(settings.escritorio_cnpj)}
               </span>
             )}
           </div>
         </div>
+
 
         {/* Right side */}
         <div className="flex items-center gap-2">

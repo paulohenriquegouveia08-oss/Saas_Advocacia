@@ -9,7 +9,7 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Building2, User, Users, Settings as SettingsIcon, Loader2, Save, Shield } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, formatCNPJ } from '@/lib/utils'
 import Link from 'next/link'
 import { useUser } from '@/hooks/useUser'
 
@@ -89,9 +89,14 @@ export default function ConfiguracoesPage() {
 
   useEffect(() => {
     if (settings) {
-      setEscritorioForm(s => ({ ...s, ...settings }))
+      setEscritorioForm(s => ({
+        ...s,
+        ...settings,
+        escritorio_cnpj: settings.escritorio_cnpj ? formatCNPJ(settings.escritorio_cnpj) : ''
+      }))
     }
   }, [settings])
+
 
   const updatePerfil = useMutation({
     mutationFn: async () => {
@@ -275,7 +280,24 @@ export default function ConfiguracoesPage() {
                     id="escritorio_cnpj"
                     label="CNPJ"
                     value={escritorioForm.escritorio_cnpj || ''}
-                    onChange={e => setEscritorioForm(p => ({ ...p, escritorio_cnpj: e.target.value }))}
+                    onChange={e => {
+                      const value = e.target.value
+                      const cleanValue = value.replace(/\D/g, '').slice(0, 14)
+                      let masked = cleanValue
+                      if (cleanValue.length > 2) {
+                        masked = cleanValue.replace(/^(\d{2})/, '$1.')
+                      }
+                      if (cleanValue.length > 5) {
+                        masked = cleanValue.replace(/^(\d{2})(\d{3})/, '$1.$2.')
+                      }
+                      if (cleanValue.length > 8) {
+                        masked = cleanValue.replace(/^(\d{2})(\d{3})(\d{3})/, '$1.$2.$3/')
+                      }
+                      if (cleanValue.length > 12) {
+                        masked = cleanValue.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})/, '$1.$2.$3/$4-')
+                      }
+                      setEscritorioForm(p => ({ ...p, escritorio_cnpj: masked }))
+                    }}
                     placeholder="00.000.000/0001-00"
                   />
                   
