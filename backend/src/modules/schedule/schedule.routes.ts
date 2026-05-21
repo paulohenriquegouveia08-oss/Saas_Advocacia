@@ -10,6 +10,6 @@ export async function scheduleRoutes(app: FastifyInstance) {
 
   app.get('/schedule', { preHandler: [requirePermission('schedule:read')] }, controller.findAll.bind(controller))
   app.post('/schedule', { preHandler: [requirePermission('schedule:create')] }, controller.create.bind(controller))
-  app.put('/schedule/:id', { preHandler: [requirePermission('schedule:update')] }, controller.update.bind(controller))
-  app.delete('/schedule/:id', { preHandler: [requirePermission('schedule:delete')] }, controller.delete.bind(controller))
+  app.put<{ Params: { id: string } }>('/schedule/:id', { preHandler: [requirePermission('schedule:update')] }, controller.update.bind(controller))
+  app.delete<{ Params: { id: string } }>('/schedule/:id', { preHandler: [requirePermission('schedule:delete')] }, controller.delete.bind(controller))
 }
