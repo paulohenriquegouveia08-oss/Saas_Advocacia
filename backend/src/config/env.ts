@@ -4,7 +4,7 @@ import { z } from 'zod'
 const envSchema = z.object({
   PORT: z.coerce.number().default(3333),
   HOST: z.string().default('0.0.0.0'),
-  DATABASE_URL: z.string({ required_error: 'DATABASE_URL é obrigatória' }),
+  DATABASE_URL: z.string().optional(),
   SUPABASE_URL: z.string({ required_error: 'SUPABASE_URL é obrigatória' }),
   SUPABASE_ANON_KEY: z.string({ required_error: 'SUPABASE_ANON_KEY é obrigatória' }),
   SUPABASE_SERVICE_ROLE_KEY: z.string({ required_error: 'SUPABASE_SERVICE_ROLE_KEY é obrigatória' }),
@@ -21,7 +21,7 @@ if (!parsed.success) {
     console.error(`   → ${issue.path.join('.')}: ${issue.message}`)
   }
   // Listar quais vars existem e quais não
-  const required = ['DATABASE_URL', 'SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY']
+  const required = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY']
   for (const key of required) {
     console.error(`   ${key}: ${process.env[key] ? '✅ definida' : '❌ NÃO DEFINIDA'}`)
   }

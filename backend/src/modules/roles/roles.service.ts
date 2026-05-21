@@ -1,114 +1,144 @@
-import { query, queryOne } from '../../config/database'
+import { supabaseAdmin } from '../../config/supabase'
 import { ApiError } from '../../utils/api-error'
 import type { CreateRoleData, UpdateRoleData } from './roles.schema'
 
 export class RolesService {
   async listRoles() {
-    const roles = await query(`
-      SELECT 
-        r.id, 
-        r.nome, 
-        r.descricao, 
-        r.created_at,
-        COUNT(DISTINCT ur.user_id) as users_count,
-        array_remove(array_agg(DISTINCT p.chave), NULL) as permissions
-      FROM roles r
-      LEFT JOIN user_roles ur ON ur.role_id = r.id
-      LEFT JOIN role_permissions rp ON rp.role_id = r.id
-      LEFT JOIN permissions p ON p.id = rp.permission_id
-      GROUP BY r.id
-      ORDER BY r.nome ASC
-    `)
-    
+    const { data: roles } = await supabaseAdmin
+      .from('roles')
+      .select('id, nome, descricao, created_at')
+      .order('nome', { ascending: true })
+
+    if (!roles || roles.length === 0) return []
+
+    const roleIds = roles.map(r => r.id)
+
+    const { data: userRoleCounts } = await supabaseAdmin
+      .from('user_roles')
+      .select('role_id')
+      .in('role_id', roleIds)
+
+    const { data: rolePerms } = await supabaseAdmin
+      .from('role_permissions')
+      .select('role_id, permissions(chave)')
+      .in('role_id', roleIds)
+
+    const countMap: Record<string, number> = {}
+    if (userRoleCounts) {
+      for (const ur of userRoleCounts) {
+        countMap[ur.role_id] = (countMap[ur.role_id] || 0) + 1
+      }
+    }
+
+    const permMap: Record<string, string[]> = {}
+    if (rolePerms) {
+      for (const rp of rolePerms) {
+        const key = rp.role_id
+        if (!permMap[key]) permMap[key] = []
+        const perm = (rp as any).permissions?.chave
+        if (perm && !permMap[key].includes(perm)) permMap[key].push(perm)
+      }
+    }
+
     return roles.map(r => ({
       ...r,
-      users_count: parseInt(r.users_count || '0', 10),
-      permissions: r.permissions || []
+      users_count: countMap[r.id] || 0,
+      permissions: permMap[r.id] || [],
     }))
   }
 
   async getPermissions() {
-    const permissions = await query(`
-      SELECT id, nome, chave, grupo
-      FROM permissions
-      ORDER BY grupo ASC, nome ASC
-    `)
-    return permissions
+    const { data } = await supabaseAdmin
+      .from('permissions')
+      .select('id, nome, chave, grupo')
+      .order('grupo', { ascending: true })
+      .order('nome', { ascending: true })
+    return data || []
   }
 
   async createRole(data: CreateRoleData) {
-    // 1. Inserir a role
-    const role = await queryOne<{ id: string }>(
-      'INSERT INTO roles (nome, descricao) VALUES ($1, $2) RETURNING id',
-      [data.nome, data.descricao || null]
-    )
+    const { data: role, error } = await supabaseAdmin
+      .from('roles')
+      .insert({ nome: data.nome, descricao: data.descricao || null })
+      .select('id')
+      .single()
 
-    if (!role) throw ApiError.internal('Erro ao criar cargo')
+    if (error || !role) throw ApiError.internal('Erro ao criar cargo')
 
-    // 2. Vincular permissões
     if (data.permissions && data.permissions.length > 0) {
-      const placeholders = data.permissions.map((_, i) => `($1, (SELECT id FROM permissions WHERE chave = $${i + 2}))`).join(', ')
-      await query(
-        `INSERT INTO role_permissions (role_id, permission_id) VALUES ${placeholders}`,
-        [role.id, ...data.permissions]
-      )
+      const { data: perms } = await supabaseAdmin
+        .from('permissions')
+        .select('id, chave')
+        .in('chave', data.permissions)
+
+      if (perms) {
+        const rolePerms = perms.map(p => ({ role_id: role.id, permission_id: p.id }))
+        await supabaseAdmin.from('role_permissions').insert(rolePerms)
+      }
     }
 
     return role
   }
 
   async updateRole(id: string, data: UpdateRoleData) {
-    const current = await queryOne('SELECT id FROM roles WHERE id = $1', [id])
+    const { data: current } = await supabaseAdmin
+      .from('roles')
+      .select('id')
+      .eq('id', id)
+      .single()
+
     if (!current) throw ApiError.notFound('Cargo não encontrado')
 
     if (data.nome || data.descricao !== undefined) {
-      const updates = []
-      const values = []
-      let idx = 1
+      const updateData: Record<string, any> = { updated_at: new Date().toISOString() }
+      if (data.nome) updateData.nome = data.nome
+      if (data.descricao !== undefined) updateData.descricao = data.descricao || null
 
-      if (data.nome) {
-        updates.push(`nome = $${idx++}`)
-        values.push(data.nome)
-      }
-      if (data.descricao !== undefined) {
-        updates.push(`descricao = $${idx++}`)
-        values.push(data.descricao || null)
-      }
-
-      values.push(id)
-      await query(
-        `UPDATE roles SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${idx}`,
-        values
-      )
+      await supabaseAdmin
+        .from('roles')
+        .update(updateData)
+        .eq('id', id)
     }
 
     if (data.permissions) {
-      // Deletar as antigas e inserir as novas
-      await query('DELETE FROM role_permissions WHERE role_id = $1', [id])
-      
+      await supabaseAdmin.from('role_permissions').delete().eq('role_id', id)
+
       if (data.permissions.length > 0) {
-        const placeholders = data.permissions.map((_, i) => `($1, (SELECT id FROM permissions WHERE chave = $${i + 2}))`).join(', ')
-        await query(
-          `INSERT INTO role_permissions (role_id, permission_id) VALUES ${placeholders}`,
-          [id, ...data.permissions]
-        )
+        const { data: perms } = await supabaseAdmin
+          .from('permissions')
+          .select('id, chave')
+          .in('chave', data.permissions)
+
+        if (perms) {
+          const rolePerms = perms.map(p => ({ role_id: id, permission_id: p.id }))
+          await supabaseAdmin.from('role_permissions').insert(rolePerms)
+        }
       }
     }
   }
 
   async deleteRole(id: string) {
-    const role = await queryOne('SELECT id, nome FROM roles WHERE id = $1', [id])
+    const { data: role } = await supabaseAdmin
+      .from('roles')
+      .select('id, nome')
+      .eq('id', id)
+      .single()
+
     if (!role) throw ApiError.notFound('Cargo não encontrado')
 
     if (['admin_global', 'funcionario', 'cliente'].includes(role.nome)) {
       throw ApiError.badRequest('Não é possível excluir os cargos padrões do sistema')
     }
 
-    const usersCount = await queryOne<{ count: string }>('SELECT COUNT(*) as count FROM user_roles WHERE role_id = $1', [id])
-    if (parseInt(usersCount?.count || '0', 10) > 0) {
+    const { count } = await supabaseAdmin
+      .from('user_roles')
+      .select('*', { count: 'exact', head: true })
+      .eq('role_id', id)
+
+    if ((count || 0) > 0) {
       throw ApiError.badRequest('Não é possível excluir um cargo que possui usuários vinculados')
     }
 
-    await query('DELETE FROM roles WHERE id = $1', [id])
+    await supabaseAdmin.from('roles').delete().eq('id', id)
   }
 }

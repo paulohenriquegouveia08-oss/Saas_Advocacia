@@ -1,5 +1,5 @@
 import cron from 'node-cron'
-import { query } from '../config/database'
+import { supabaseAdmin } from '../config/supabase'
 import { NotificationRepository } from '../modules/notifications/notification.repository'
 
 const notificationRepo = new NotificationRepository()
@@ -13,29 +13,49 @@ interface DeadlineWithUser {
   dias_restantes: number
 }
 
-/**
- * Job diário (08h): verifica prazos e gera notificações automaticamente
- *
- * Regras:
- * 1. Prazos vencendo em 1, 3 e 7 dias → notificação tipo 'prazo_proximo'
- * 2. Prazos vencidos (data < hoje) e não concluídos → notificação tipo 'prazo_vencido' + atualiza status para 'atrasado'
- * 3. Deduplicação: não cria se já existir notificação com mesmo deadline_id + user_id + tipo
- */
+function daysUntil(dateStr: string): number {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const target = new Date(dateStr)
+  target.setHours(0, 0, 0, 0)
+  return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+}
+
 async function processDeadlineNotifications() {
   console.log('[JOB] Iniciando verificação de prazos...', new Date().toISOString())
 
   try {
-    // 1. Prazos vencendo em 1, 3 e 7 dias (com responsável atribuído)
-    const upcomingDeadlines = await query<DeadlineWithUser>(
-      `SELECT d.id, d.descricao, d.data_vencimento, d.responsavel_id,
-              p.numero AS processo_numero,
-              (d.data_vencimento - CURRENT_DATE) AS dias_restantes
-       FROM deadlines d
-       JOIN processes p ON d.process_id = p.id
-       WHERE d.status = 'pendente'
-         AND d.responsavel_id IS NOT NULL
-         AND (d.data_vencimento - CURRENT_DATE) IN (1, 3, 7)`
-    )
+    const { data: deadlines } = await supabaseAdmin
+      .from('deadlines')
+      .select('id, descricao, data_vencimento, responsavel_id, processes(numero)')
+      .eq('status', 'pendente')
+      .not('responsavel_id', 'is', null)
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const upcomingDeadlines: DeadlineWithUser[] = []
+    const overdueDeadlines: DeadlineWithUser[] = []
+
+    for (const d of deadlines || []) {
+      const dias = daysUntil(d.data_vencimento)
+      const entry = {
+        id: d.id,
+        descricao: d.descricao,
+        data_vencimento: d.data_vencimento,
+        responsavel_id: d.responsavel_id,
+        processo_numero: (d as any).processes?.numero || '',
+        dias_restantes: dias,
+      }
+
+      if ([1, 3, 7].includes(dias)) {
+        upcomingDeadlines.push(entry)
+      }
+
+      if (dias < 0) {
+        overdueDeadlines.push(entry)
+      }
+    }
 
     for (const deadline of upcomingDeadlines) {
       await notificationRepo.createIfNotExists({
@@ -48,20 +68,7 @@ async function processDeadlineNotifications() {
 
     console.log(`[JOB] ${upcomingDeadlines.length} prazos próximos processados.`)
 
-    // 2. Prazos vencidos
-    const overdueDeadlines = await query<DeadlineWithUser>(
-      `SELECT d.id, d.descricao, d.data_vencimento, d.responsavel_id,
-              p.numero AS processo_numero,
-              (d.data_vencimento - CURRENT_DATE) AS dias_restantes
-       FROM deadlines d
-       JOIN processes p ON d.process_id = p.id
-       WHERE d.data_vencimento < CURRENT_DATE
-         AND d.status != 'concluido'
-         AND d.responsavel_id IS NOT NULL`
-    )
-
     for (const deadline of overdueDeadlines) {
-      // Create overdue notification
       await notificationRepo.createIfNotExists({
         deadline_id: deadline.id,
         user_id: deadline.responsavel_id,
@@ -70,12 +77,15 @@ async function processDeadlineNotifications() {
       })
     }
 
-    // Update status of overdue deadlines to 'atrasado'
-    await query(
-      `UPDATE deadlines SET status = 'atrasado'
-       WHERE data_vencimento < CURRENT_DATE
-         AND status = 'pendente'`
-    )
+    // Update status of overdue deadlines
+    const overdueIds = overdueDeadlines.map(d => d.id)
+    if (overdueIds.length > 0) {
+      await supabaseAdmin
+        .from('deadlines')
+        .update({ status: 'atrasado' })
+        .in('id', overdueIds)
+        .eq('status', 'pendente')
+    }
 
     console.log(`[JOB] ${overdueDeadlines.length} prazos vencidos processados.`)
     console.log('[JOB] Verificação de prazos concluída.', new Date().toISOString())
@@ -85,7 +95,6 @@ async function processDeadlineNotifications() {
 }
 
 export function startDeadlineNotificationJob() {
-  // Run every day at 08:00
   cron.schedule('0 8 * * *', processDeadlineNotifications, {
     timezone: 'America/Sao_Paulo',
   })
@@ -93,5 +102,4 @@ export function startDeadlineNotificationJob() {
   console.log('[JOB] Job de notificações de prazos agendado para 08:00 diariamente.')
 }
 
-// Export for manual trigger (useful for testing)
 export { processDeadlineNotifications }

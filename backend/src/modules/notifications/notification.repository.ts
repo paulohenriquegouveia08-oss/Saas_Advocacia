@@ -1,4 +1,4 @@
-import { query, queryOne, queryCount } from '../../config/database'
+import { supabaseAdmin } from '../../config/supabase'
 
 export interface NotificationRow {
   id: string
@@ -12,82 +12,85 @@ export interface NotificationRow {
 
 export class NotificationRepository {
   async findByUser(userId: string, params: { page: number; limit: number }): Promise<{ data: NotificationRow[]; total: number }> {
-    const offset = (params.page - 1) * params.limit
+    const from = (params.page - 1) * params.limit
+    const to = from + params.limit - 1
 
-    const total = await queryCount(
-      'SELECT COUNT(*) FROM notifications WHERE user_id = $1',
-      [userId]
-    )
+    const { data, count } = await supabaseAdmin
+      .from('notifications')
+      .select('*', { count: 'exact' })
+      .eq('user_id', userId)
+      .order('lida', { ascending: true })
+      .order('created_at', { ascending: false })
+      .range(from, to)
 
-    const data = await query<NotificationRow>(
-      `SELECT * FROM notifications
-       WHERE user_id = $1
-       ORDER BY lida ASC, created_at DESC
-       LIMIT $2 OFFSET $3`,
-      [userId, params.limit, offset]
-    )
-
-    return { data, total }
+    return { data: (data || []) as NotificationRow[], total: count || 0 }
   }
 
   async markAsRead(id: string, userId: string): Promise<NotificationRow | null> {
-    return queryOne<NotificationRow>(
-      `UPDATE notifications SET lida = true
-       WHERE id = $1 AND user_id = $2
-       RETURNING *`,
-      [id, userId]
-    )
+    const { data } = await supabaseAdmin
+      .from('notifications')
+      .update({ lida: true })
+      .eq('id', id)
+      .eq('user_id', userId)
+      .select()
+      .single()
+    return (data || null) as NotificationRow | null
   }
 
   async markAllAsRead(userId: string): Promise<number> {
-    const result = await query(
-      `UPDATE notifications SET lida = true
-       WHERE user_id = $1 AND lida = false
-       RETURNING id`,
-      [userId]
-    )
-    return result.length
+    const { data } = await supabaseAdmin
+      .from('notifications')
+      .update({ lida: true })
+      .eq('user_id', userId)
+      .eq('lida', false)
+      .select('id')
+    return data?.length || 0
   }
 
   async getUnreadCount(userId: string): Promise<number> {
-    return queryCount(
-      'SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND lida = false',
-      [userId]
-    )
+    const { count } = await supabaseAdmin
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('lida', false)
+    return count || 0
   }
 
   async markReadByDeadline(deadlineId: string): Promise<void> {
-    await query(
-      'UPDATE notifications SET lida = true WHERE deadline_id = $1',
-      [deadlineId]
-    )
+    await supabaseAdmin
+      .from('notifications')
+      .update({ lida: true })
+      .eq('deadline_id', deadlineId)
   }
 
-  /**
-   * Cria notificação apenas se não existir uma com mesmo deadline_id + user_id + tipo
-   * (deduplicação para evitar notificações duplicadas)
-   */
   async createIfNotExists(data: {
     deadline_id: string
     user_id: string
     tipo: string
     mensagem: string
   }): Promise<NotificationRow | null> {
-    // Check for existing
-    const existing = await queryOne<NotificationRow>(
-      `SELECT * FROM notifications
-       WHERE deadline_id = $1 AND user_id = $2 AND tipo = $3`,
-      [data.deadline_id, data.user_id, data.tipo]
-    )
+    const { data: existing } = await supabaseAdmin
+      .from('notifications')
+      .select('*')
+      .eq('deadline_id', data.deadline_id)
+      .eq('user_id', data.user_id)
+      .eq('tipo', data.tipo)
+      .single()
 
-    if (existing) return null // Already exists, skip
+    if (existing) return null
 
-    return queryOne<NotificationRow>(
-      `INSERT INTO notifications (deadline_id, user_id, tipo, mensagem)
-       VALUES ($1, $2, $3, $4)
-       RETURNING *`,
-      [data.deadline_id, data.user_id, data.tipo, data.mensagem]
-    )
+    const { data: result } = await supabaseAdmin
+      .from('notifications')
+      .insert({
+        deadline_id: data.deadline_id,
+        user_id: data.user_id,
+        tipo: data.tipo,
+        mensagem: data.mensagem,
+      })
+      .select()
+      .single()
+
+    return (result || null) as NotificationRow | null
   }
 
   async create(data: {
@@ -96,12 +99,17 @@ export class NotificationRepository {
     tipo: string
     mensagem: string
   }): Promise<NotificationRow> {
-    const result = await queryOne<NotificationRow>(
-      `INSERT INTO notifications (deadline_id, user_id, tipo, mensagem)
-       VALUES ($1, $2, $3, $4)
-       RETURNING *`,
-      [data.deadline_id || null, data.user_id, data.tipo, data.mensagem]
-    )
-    return result!
+    const { data: result, error } = await supabaseAdmin
+      .from('notifications')
+      .insert({
+        deadline_id: data.deadline_id || null,
+        user_id: data.user_id,
+        tipo: data.tipo,
+        mensagem: data.mensagem,
+      })
+      .select()
+      .single()
+    if (error || !result) throw error
+    return result as NotificationRow
   }
 }

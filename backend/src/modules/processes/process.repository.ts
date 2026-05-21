@@ -1,4 +1,4 @@
-import { query, queryOne, queryCount } from '../../config/database'
+import { supabaseAdmin } from '../../config/supabase'
 
 export interface ProcessRow {
   id: string
@@ -23,114 +23,120 @@ export interface MovementRow {
 
 export class ProcessRepository {
   async findAll(params: { status?: string; client_id?: string; search?: string; page: number; limit: number }): Promise<{ data: ProcessRow[]; total: number }> {
-    const offset = (params.page - 1) * params.limit
-    const conditions: string[] = []
-    const values: any[] = []
-    let idx = 1
+    let q = supabaseAdmin.from('processes').select('*, clients(nome)', { count: 'exact' })
 
-    if (params.status) {
-      conditions.push(`p.status = $${idx++}`)
-      values.push(params.status)
-    }
-    if (params.client_id) {
-      conditions.push(`p.client_id = $${idx++}`)
-      values.push(params.client_id)
-    }
+    if (params.status) q = q.eq('status', params.status)
+    if (params.client_id) q = q.eq('client_id', params.client_id)
     if (params.search) {
-      conditions.push(`(p.numero ILIKE $${idx} OR p.tribunal ILIKE $${idx} OR p.tipo_acao ILIKE $${idx} OR p.parte_contraria ILIKE $${idx} OR c.nome ILIKE $${idx})`)
-      values.push(`%${params.search}%`)
-      idx++
+      q = q.or(`numero.ilike.%${params.search}%,tribunal.ilike.%${params.search}%,tipo_acao.ilike.%${params.search}%,parte_contraria.ilike.%${params.search}%,clients.nome.ilike.%${params.search}%`)
     }
 
-    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
-    console.log('[DEBUG] WHERE:', where, '| VALUES:', values)
+    const from = (params.page - 1) * params.limit
+    const to = from + params.limit - 1
 
-    const total = await queryCount(
-      `SELECT COUNT(*) FROM processes p JOIN clients c ON p.client_id = c.id ${where}`,
-      values
-    )
+    const { data, count } = await q
+      .order('created_at', { ascending: false })
+      .range(from, to)
 
-    const limitIdx = idx++
-    const offsetIdx = idx++
+    const mapped = (data || []).map((p: any) => ({
+      ...p,
+      cliente_nome: p.clients?.nome || null,
+    }))
 
-    const data = await query<ProcessRow>(
-      `SELECT p.*, c.nome AS cliente_nome
-       FROM processes p
-       JOIN clients c ON p.client_id = c.id
-       ${where}
-       ORDER BY p.created_at DESC
-       LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
-      [...values, params.limit, offset]
-    )
-
-    return { data, total }
+    return { data: mapped as ProcessRow[], total: count || 0 }
   }
 
   async findById(id: string): Promise<ProcessRow | null> {
-    return queryOne<ProcessRow>(
-      `SELECT p.*, c.nome AS cliente_nome
-       FROM processes p
-       JOIN clients c ON p.client_id = c.id
-       WHERE p.id = $1`,
-      [id]
-    )
+    const { data } = await supabaseAdmin
+      .from('processes')
+      .select('*, clients(nome)')
+      .eq('id', id)
+      .single()
+
+    if (!data) return null
+    return {
+      ...data,
+      cliente_nome: (data as any).clients?.nome || null,
+    } as ProcessRow
   }
 
   async findByNumero(numero: string): Promise<ProcessRow | null> {
-    return queryOne<ProcessRow>('SELECT * FROM processes WHERE numero = $1', [numero])
+    const { data } = await supabaseAdmin
+      .from('processes')
+      .select('*')
+      .eq('numero', numero)
+      .single()
+    return (data || null) as ProcessRow | null
   }
 
   async create(data: { client_id: string; numero: string; tribunal?: string; tipo_acao?: string; parte_contraria?: string; status?: string }): Promise<ProcessRow> {
-    const result = await queryOne<ProcessRow>(
-      `INSERT INTO processes (client_id, numero, tribunal, tipo_acao, parte_contraria, status)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
-      [data.client_id, data.numero, data.tribunal || null, data.tipo_acao || null, data.parte_contraria || null, data.status || 'ativo']
-    )
-    return result!
+    const { data: result, error } = await supabaseAdmin
+      .from('processes')
+      .insert({
+        client_id: data.client_id,
+        numero: data.numero,
+        tribunal: data.tribunal || null,
+        tipo_acao: data.tipo_acao || null,
+        parte_contraria: data.parte_contraria || null,
+        status: data.status || 'ativo',
+      })
+      .select()
+      .single()
+    if (error || !result) throw error
+    return result as ProcessRow
   }
 
   async update(id: string, data: { client_id?: string; numero?: string; tribunal?: string; tipo_acao?: string; parte_contraria?: string; status?: string }): Promise<ProcessRow | null> {
-    const fields: string[] = []
-    const values: any[] = []
-    let idx = 1
+    const updateData: Record<string, any> = {}
+    if (data.client_id !== undefined) updateData.client_id = data.client_id
+    if (data.numero !== undefined) updateData.numero = data.numero
+    if (data.tribunal !== undefined) updateData.tribunal = data.tribunal
+    if (data.tipo_acao !== undefined) updateData.tipo_acao = data.tipo_acao
+    if (data.parte_contraria !== undefined) updateData.parte_contraria = data.parte_contraria
+    if (data.status !== undefined) updateData.status = data.status
 
-    if (data.client_id !== undefined) { fields.push(`client_id = $${idx++}`); values.push(data.client_id) }
-    if (data.numero !== undefined) { fields.push(`numero = $${idx++}`); values.push(data.numero) }
-    if (data.tribunal !== undefined) { fields.push(`tribunal = $${idx++}`); values.push(data.tribunal) }
-    if (data.tipo_acao !== undefined) { fields.push(`tipo_acao = $${idx++}`); values.push(data.tipo_acao) }
-    if (data.parte_contraria !== undefined) { fields.push(`parte_contraria = $${idx++}`); values.push(data.parte_contraria) }
-    if (data.status !== undefined) { fields.push(`status = $${idx++}`); values.push(data.status) }
+    if (Object.keys(updateData).length === 0) return this.findById(id)
 
-    if (fields.length === 0) return this.findById(id)
-
-    values.push(id)
-    return queryOne<ProcessRow>(
-      `UPDATE processes SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
-      values
-    )
+    const { data: result } = await supabaseAdmin
+      .from('processes')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single()
+    return (result || null) as ProcessRow | null
   }
 
   async delete(id: string): Promise<boolean> {
-    const result = await queryOne<{ id: string }>('DELETE FROM processes WHERE id = $1 RETURNING id', [id])
-    return result !== null
+    const { data } = await supabaseAdmin
+      .from('processes')
+      .delete()
+      .eq('id', id)
+      .select('id')
+      .single()
+    return data !== null
   }
 
-  // Movements
   async findMovements(processId: string): Promise<MovementRow[]> {
-    return query<MovementRow>(
-      'SELECT * FROM process_movements WHERE process_id = $1 ORDER BY data DESC, created_at DESC',
-      [processId]
-    )
+    const { data } = await supabaseAdmin
+      .from('process_movements')
+      .select('*')
+      .eq('process_id', processId)
+      .order('data', { ascending: false })
+    return (data || []) as MovementRow[]
   }
 
   async createMovement(data: { process_id: string; tipo?: string; descricao?: string; data?: string }): Promise<MovementRow> {
-    const result = await queryOne<MovementRow>(
-      `INSERT INTO process_movements (process_id, tipo, descricao, data)
-       VALUES ($1, $2, $3, $4)
-       RETURNING *`,
-      [data.process_id, data.tipo || null, data.descricao || null, data.data || null]
-    )
-    return result!
+    const { data: result, error } = await supabaseAdmin
+      .from('process_movements')
+      .insert({
+        process_id: data.process_id,
+        tipo: data.tipo || null,
+        descricao: data.descricao || null,
+        data: data.data || null,
+      })
+      .select()
+      .single()
+    if (error || !result) throw error
+    return result as MovementRow
   }
 }

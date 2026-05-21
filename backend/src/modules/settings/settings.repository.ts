@@ -1,4 +1,4 @@
-import { query, queryOne } from '../../config/database'
+import { supabaseAdmin } from '../../config/supabase'
 
 export interface SettingsRow {
   id: string
@@ -26,15 +26,24 @@ export interface UserPreferencesRow {
 
 export class SettingsRepository {
   async getSettings(): Promise<SettingsRow | null> {
-    return queryOne<SettingsRow>('SELECT * FROM settings LIMIT 1')
+    const { data } = await supabaseAdmin
+      .from('settings')
+      .select('*')
+      .limit(1)
+      .single()
+    return (data || null) as SettingsRow | null
   }
 
   async getOrCreateSettings(): Promise<SettingsRow> {
     let settings = await this.getSettings()
     if (!settings) {
-      settings = await queryOne<SettingsRow>(
-        `INSERT INTO settings (escritorio_nome) VALUES ('Meu Escritório') RETURNING *`
-      ) as SettingsRow
+      const { data, error } = await supabaseAdmin
+        .from('settings')
+        .insert({ escritorio_nome: 'Meu Escritório' })
+        .select()
+        .single()
+      if (error || !data) throw error
+      settings = data as SettingsRow
     }
     return settings
   }
@@ -45,62 +54,67 @@ export class SettingsRepository {
       return this.getOrCreateSettings()
     }
 
-    const fields: string[] = []
-    const values: any[] = []
-    let idx = 1
+    const updateData: Record<string, any> = {}
+    if (data.escritorio_nome !== undefined) updateData.escritorio_nome = data.escritorio_nome
+    if (data.escritorio_cnpj !== undefined) updateData.escritorio_cnpj = data.escritorio_cnpj
+    if (data.escritorio_telefone !== undefined) updateData.escritorio_telefone = data.escritorio_telefone
+    if (data.escritorio_email !== undefined) updateData.escritorio_email = data.escritorio_email
+    if (data.escritorio_endereco !== undefined) updateData.escritorio_endereco = data.escritorio_endereco
+    if (data.escritorio_logo !== undefined) updateData.escritorio_logo = data.escritorio_logo
+    if (data.notificar_prazo_vencido !== undefined) updateData.notificar_prazo_vencido = data.notificar_prazo_vencido
+    if (data.notificar_prazo_proximo !== undefined) updateData.notificar_prazo_proximo = data.notificar_prazo_proximo
+    if (data.dias_antecedencia !== undefined) updateData.dias_antecedencia = data.dias_antecedencia
 
-    if (data.escritorio_nome !== undefined) { fields.push(`escritorio_nome = $${idx++}`); values.push(data.escritorio_nome) }
-    if (data.escritorio_cnpj !== undefined) { fields.push(`escritorio_cnpj = $${idx++}`); values.push(data.escritorio_cnpj) }
-    if (data.escritorio_telefone !== undefined) { fields.push(`escritorio_telefone = $${idx++}`); values.push(data.escritorio_telefone) }
-    if (data.escritorio_email !== undefined) { fields.push(`escritorio_email = $${idx++}`); values.push(data.escritorio_email) }
-    if (data.escritorio_endereco !== undefined) { fields.push(`escritorio_endereco = $${idx++}`); values.push(data.escritorio_endereco) }
-    if (data.escritorio_logo !== undefined) { fields.push(`escritorio_logo = $${idx++}`); values.push(data.escritorio_logo) }
-    if (data.notificar_prazo_vencido !== undefined) { fields.push(`notificar_prazo_vencido = $${idx++}`); values.push(data.notificar_prazo_vencido) }
-    if (data.notificar_prazo_proximo !== undefined) { fields.push(`notificar_prazo_proximo = $${idx++}`); values.push(data.notificar_prazo_proximo) }
-    if (data.dias_antecedencia !== undefined) { fields.push(`dias_antecedencia = $${idx++}`); values.push(data.dias_antecedencia) }
+    if (Object.keys(updateData).length === 0) return this.getSettings()
 
-    if (fields.length === 0) return this.getSettings()
-
-    const result = queryOne<SettingsRow>(
-      `UPDATE settings SET ${fields.join(', ')} WHERE id = $${idx++} RETURNING *`,
-      [...values, existing.id]
-    )
-    return result
+    const { data: result } = await supabaseAdmin
+      .from('settings')
+      .update(updateData)
+      .eq('id', existing.id)
+      .select()
+      .single()
+    return (result || null) as SettingsRow | null
   }
 
   async getUserPreferences(userId: string): Promise<UserPreferencesRow | null> {
-    return queryOne<UserPreferencesRow>(
-      'SELECT * FROM user_preferences WHERE user_id = $1',
-      [userId]
-    )
+    const { data } = await supabaseAdmin
+      .from('user_preferences')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
+    return (data || null) as UserPreferencesRow | null
   }
 
   async upsertUserPreferences(userId: string, data: Partial<UserPreferencesRow>): Promise<UserPreferencesRow> {
     const existing = await this.getUserPreferences(userId)
-    
+
     if (existing) {
-      const fields: string[] = []
-      const values: any[] = []
-      let idx = 1
+      const updateData: Record<string, any> = {}
+      if (data.theme !== undefined) updateData.theme = data.theme
+      if (data.notificacoes_email !== undefined) updateData.notificacoes_email = data.notificacoes_email
 
-      if (data.theme !== undefined) { fields.push(`theme = $${idx++}`); values.push(data.theme) }
-      if (data.notificacoes_email !== undefined) { fields.push(`notificacoes_email = $${idx++}`); values.push(data.notificacoes_email) }
-
-      if (fields.length > 0) {
-        values.push(userId)
-        const result = await queryOne<UserPreferencesRow>(
-          `UPDATE user_preferences SET ${fields.join(', ')} WHERE user_id = $${idx} RETURNING *`,
-          values
-        )
-        return result as UserPreferencesRow
+      if (Object.keys(updateData).length > 0) {
+        const { data: result } = await supabaseAdmin
+          .from('user_preferences')
+          .update(updateData)
+          .eq('user_id', userId)
+          .select()
+          .single()
+        return (result || existing) as UserPreferencesRow
       }
       return existing
     }
 
-    const result = await queryOne<UserPreferencesRow>(
-      `INSERT INTO user_preferences (user_id, theme, notificacoes_email) VALUES ($1, $2, $3) RETURNING *`,
-      [userId, data.theme || 'dark', data.notificacoes_email || false]
-    )
+    const { data: result, error } = await supabaseAdmin
+      .from('user_preferences')
+      .insert({
+        user_id: userId,
+        theme: data.theme || 'dark',
+        notificacoes_email: data.notificacoes_email || false,
+      })
+      .select()
+      .single()
+    if (error || !result) throw error
     return result as UserPreferencesRow
   }
 }

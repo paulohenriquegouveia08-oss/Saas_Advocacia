@@ -1,12 +1,6 @@
 import { getSupabase } from './auth'
 
-const isBrowser = typeof window !== 'undefined';
-const isLocalhost = isBrowser && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-
-// Se estiver na Vercel (browser e não-localhost), ignoramos a env e usamos /api
-const API_URL = (isBrowser && !isLocalhost) 
-  ? '/api' 
-  : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3333');
+const API_URL = '/api';
 
 class ApiClient {
   private baseUrl: string

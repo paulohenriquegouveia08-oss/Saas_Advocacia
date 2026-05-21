@@ -9,6 +9,7 @@ export type Permission =
   | 'notifications:read' | 'notifications:update'
   | 'financial:create' | 'financial:read' | 'financial:update' | 'financial:delete'
   | 'settings:read' | 'settings:update'
+  | 'schedule:create' | 'schedule:read' | 'schedule:update' | 'schedule:delete'
 
 const ALL_PERMISSIONS: Permission[] = [
   'users:create', 'users:read', 'users:update', 'users:delete',
@@ -19,6 +20,7 @@ const ALL_PERMISSIONS: Permission[] = [
   'notifications:read', 'notifications:update',
   'financial:create', 'financial:read', 'financial:update', 'financial:delete',
   'settings:read', 'settings:update',
+  'schedule:create', 'schedule:read', 'schedule:update', 'schedule:delete',
 ]
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
@@ -31,6 +33,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'deadlines:create', 'deadlines:read', 'deadlines:update', 'deadlines:complete',
     'notifications:read', 'notifications:update',
     'financial:create', 'financial:read', 'financial:update',
+    'schedule:create', 'schedule:read', 'schedule:update', 'schedule:delete',
   ],
 }
 

@@ -1,4 +1,4 @@
-import { query, queryOne, queryCount } from '../../config/database'
+import { supabaseAdmin } from '../../config/supabase'
 
 export interface ClientRow {
   id: string
@@ -12,71 +12,73 @@ export interface ClientRow {
 
 export class ClientRepository {
   async findAll(params: { search?: string; page: number; limit: number }): Promise<{ data: ClientRow[]; total: number }> {
-    const offset = (params.page - 1) * params.limit
-    const conditions: string[] = []
-    const values: any[] = []
-    let idx = 1
+    let q = supabaseAdmin.from('clients').select('*', { count: 'exact' })
 
     if (params.search) {
-      conditions.push(`(nome ILIKE $${idx} OR cpf ILIKE $${idx})`)
-      values.push(`%${params.search}%`)
-      idx++
+      q = q.or(`nome.ilike.%${params.search}%,cpf.ilike.%${params.search}%`)
     }
 
-    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+    const from = (params.page - 1) * params.limit
+    const to = from + params.limit - 1
 
-    const total = await queryCount(
-      `SELECT COUNT(*) FROM clients ${where}`,
-      values
-    )
+    const { data, count } = await q
+      .order('created_at', { ascending: false })
+      .range(from, to)
 
-    const limitIdx = idx++
-    const offsetIdx = idx++
-
-    const data = await query<ClientRow>(
-      `SELECT * FROM clients ${where} ORDER BY created_at DESC LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
-      [...values, params.limit, offset]
-    )
-
-    return { data, total }
+    return { data: (data || []) as ClientRow[], total: count || 0 }
   }
 
   async findById(id: string): Promise<ClientRow | null> {
-    return queryOne<ClientRow>('SELECT * FROM clients WHERE id = $1', [id])
+    const { data } = await supabaseAdmin
+      .from('clients')
+      .select('*')
+      .eq('id', id)
+      .single()
+    return (data || null) as ClientRow | null
   }
 
   async create(data: { nome: string; cpf?: string; telefone?: string; email?: string; status?: string }): Promise<ClientRow> {
-    const result = await queryOne<ClientRow>(
-      `INSERT INTO clients (nome, cpf, telefone, email, status)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-      [data.nome, data.cpf || null, data.telefone || null, data.email || null, data.status || 'ativo']
-    )
-    return result!
+    const { data: result, error } = await supabaseAdmin
+      .from('clients')
+      .insert({
+        nome: data.nome,
+        cpf: data.cpf || null,
+        telefone: data.telefone || null,
+        email: data.email || null,
+        status: data.status || 'ativo',
+      })
+      .select()
+      .single()
+    if (error || !result) throw error
+    return result as ClientRow
   }
 
   async update(id: string, data: { nome?: string; cpf?: string; telefone?: string; email?: string; status?: string }): Promise<ClientRow | null> {
-    const fields: string[] = []
-    const values: any[] = []
-    let idx = 1
+    const updateData: Record<string, any> = {}
+    if (data.nome !== undefined) updateData.nome = data.nome
+    if (data.cpf !== undefined) updateData.cpf = data.cpf || null
+    if (data.telefone !== undefined) updateData.telefone = data.telefone || null
+    if (data.email !== undefined) updateData.email = data.email || null
+    if (data.status !== undefined) updateData.status = data.status
 
-    if (data.nome !== undefined) { fields.push(`nome = $${idx++}`); values.push(data.nome) }
-    if (data.cpf !== undefined) { fields.push(`cpf = $${idx++}`); values.push(data.cpf || null) }
-    if (data.telefone !== undefined) { fields.push(`telefone = $${idx++}`); values.push(data.telefone || null) }
-    if (data.email !== undefined) { fields.push(`email = $${idx++}`); values.push(data.email || null) }
-    if (data.status !== undefined) { fields.push(`status = $${idx++}`); values.push(data.status) }
+    if (Object.keys(updateData).length === 0) return this.findById(id)
 
-    if (fields.length === 0) return this.findById(id)
-
-    values.push(id)
-    return queryOne<ClientRow>(
-      `UPDATE clients SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
-      values
-    )
+    const { data: result } = await supabaseAdmin
+      .from('clients')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single()
+    return (result || null) as ClientRow | null
   }
 
   async delete(id: string): Promise<boolean> {
-    const result = await queryOne<{ id: string }>('DELETE FROM clients WHERE id = $1 RETURNING id', [id])
-    return result !== null
+    const { data } = await supabaseAdmin
+      .from('clients')
+      .delete()
+      .eq('id', id)
+      .select('id')
+      .single()
+    return data !== null
   }
 }

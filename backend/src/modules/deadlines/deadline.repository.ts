@@ -1,4 +1,4 @@
-import { query, queryOne, queryCount } from '../../config/database'
+import { supabaseAdmin } from '../../config/supabase'
 
 export interface DeadlineRow {
   id: string
@@ -14,130 +14,136 @@ export interface DeadlineRow {
   cliente_nome?: string
 }
 
+function calcUrgency(dataVencimento: string): { urgencia: string; dias_restantes: number } {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const venc = new Date(dataVencimento)
+  venc.setHours(0, 0, 0, 0)
+  const diff = Math.ceil((venc.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+
+  let urgencia: string
+  if (diff < 0) urgencia = 'vencido'
+  else if (diff === 0) urgencia = 'vence_hoje'
+  else if (diff <= 3) urgencia = 'critico'
+  else if (diff <= 7) urgencia = 'urgente'
+  else if (diff <= 30) urgencia = 'proximo'
+  else urgencia = 'normal'
+
+  return { urgencia, dias_restantes: diff }
+}
+
 export class DeadlineRepository {
   async findAllWithUrgency(params: { status?: string; responsavel_id?: string; page: number; limit: number }): Promise<{ data: DeadlineRow[]; total: number }> {
-    const offset = (params.page - 1) * params.limit
-    const conditions: string[] = ["d.status != 'concluido'"]
-    const values: any[] = []
-    let idx = 1
+    let q = supabaseAdmin.from('deadlines').select('*, processes(numero, clients(nome))', { count: 'exact' })
 
     if (params.status) {
-      conditions[0] = `d.status = $${idx++}`
-      values.push(params.status)
+      q = q.eq('status', params.status)
+    } else {
+      q = q.neq('status', 'concluido')
     }
-    if (params.responsavel_id) {
-      conditions.push(`d.responsavel_id = $${idx++}`)
-      values.push(params.responsavel_id)
-    }
+    if (params.responsavel_id) q = q.eq('responsavel_id', params.responsavel_id)
 
-    const where = `WHERE ${conditions.join(' AND ')}`
+    const from = (params.page - 1) * params.limit
+    const to = from + params.limit - 1
 
-    const total = await queryCount(
-      `SELECT COUNT(*) FROM deadlines d ${where}`,
-      values
-    )
+    const { data, count } = await q
+      .order('data_vencimento', { ascending: true })
+      .range(from, to)
 
-    const data = await query<DeadlineRow>(
-      `SELECT d.id, d.process_id, d.descricao, d.data_inicio, d.data_vencimento,
-              d.status, d.responsavel_id,
-              p.numero AS processo_numero,
-              c.nome AS cliente_nome,
-              CASE
-                WHEN d.data_vencimento < CURRENT_DATE     THEN 'vencido'
-                WHEN d.data_vencimento = CURRENT_DATE     THEN 'vence_hoje'
-                WHEN d.data_vencimento <= CURRENT_DATE+3  THEN 'critico'
-                WHEN d.data_vencimento <= CURRENT_DATE+7  THEN 'urgente'
-                WHEN d.data_vencimento <= CURRENT_DATE+30 THEN 'proximo'
-                ELSE 'normal'
-              END AS urgencia,
-              (d.data_vencimento - CURRENT_DATE) AS dias_restantes
-       FROM deadlines d
-       JOIN processes p ON d.process_id = p.id
-       JOIN clients c ON p.client_id = c.id
-       ${where}
-       ORDER BY d.data_vencimento ASC
-       LIMIT $${idx} OFFSET $${idx + 1}`,
-      [...values, params.limit, offset]
-    )
+    const mapped = (data || []).map((d: any) => {
+      const { urgencia, dias_restantes } = calcUrgency(d.data_vencimento)
+      return {
+        ...d,
+        processo_numero: d.processes?.numero || null,
+        cliente_nome: d.processes?.clients?.nome || null,
+        urgencia,
+        dias_restantes,
+      }
+    })
 
-    return { data, total }
+    return { data: mapped as DeadlineRow[], total: count || 0 }
   }
 
   async findById(id: string): Promise<DeadlineRow | null> {
-    return queryOne<DeadlineRow>(
-      `SELECT d.*, p.numero AS processo_numero, c.nome AS cliente_nome,
-              CASE
-                WHEN d.data_vencimento < CURRENT_DATE     THEN 'vencido'
-                WHEN d.data_vencimento = CURRENT_DATE     THEN 'vence_hoje'
-                WHEN d.data_vencimento <= CURRENT_DATE+3  THEN 'critico'
-                WHEN d.data_vencimento <= CURRENT_DATE+7  THEN 'urgente'
-                WHEN d.data_vencimento <= CURRENT_DATE+30 THEN 'proximo'
-                ELSE 'normal'
-              END AS urgencia,
-              (d.data_vencimento - CURRENT_DATE) AS dias_restantes
-       FROM deadlines d
-       JOIN processes p ON d.process_id = p.id
-       JOIN clients c ON p.client_id = c.id
-       WHERE d.id = $1`,
-      [id]
-    )
+    const { data } = await supabaseAdmin
+      .from('deadlines')
+      .select('*, processes(numero, clients(nome))')
+      .eq('id', id)
+      .single()
+
+    if (!data) return null
+    const { urgencia, dias_restantes } = calcUrgency(data.data_vencimento)
+    return {
+      ...data,
+      processo_numero: (data as any).processes?.numero || null,
+      cliente_nome: (data as any).processes?.clients?.nome || null,
+      urgencia,
+      dias_restantes,
+    } as DeadlineRow
   }
 
   async create(data: { process_id: string; descricao?: string; data_inicio?: string; data_vencimento: string; responsavel_id?: string }): Promise<DeadlineRow> {
-    const result = await queryOne<DeadlineRow>(
-      `INSERT INTO deadlines (process_id, descricao, data_inicio, data_vencimento, responsavel_id)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-      [data.process_id, data.descricao || null, data.data_inicio || null, data.data_vencimento, data.responsavel_id || null]
-    )
-    return result!
+    const { data: result, error } = await supabaseAdmin
+      .from('deadlines')
+      .insert({
+        process_id: data.process_id,
+        descricao: data.descricao || null,
+        data_inicio: data.data_inicio || null,
+        data_vencimento: data.data_vencimento,
+        responsavel_id: data.responsavel_id || null,
+      })
+      .select()
+      .single()
+    if (error || !result) throw error
+    return result as DeadlineRow
   }
 
   async update(id: string, data: { descricao?: string; data_inicio?: string; data_vencimento?: string; status?: string; responsavel_id?: string | null }): Promise<DeadlineRow | null> {
-    const fields: string[] = []
-    const values: any[] = []
-    let idx = 1
+    const updateData: Record<string, any> = {}
+    if (data.descricao !== undefined) updateData.descricao = data.descricao
+    if (data.data_inicio !== undefined) updateData.data_inicio = data.data_inicio
+    if (data.data_vencimento !== undefined) updateData.data_vencimento = data.data_vencimento
+    if (data.status !== undefined) updateData.status = data.status
+    if (data.responsavel_id !== undefined) updateData.responsavel_id = data.responsavel_id
 
-    if (data.descricao !== undefined) { fields.push(`descricao = $${idx++}`); values.push(data.descricao) }
-    if (data.data_inicio !== undefined) { fields.push(`data_inicio = $${idx++}`); values.push(data.data_inicio) }
-    if (data.data_vencimento !== undefined) { fields.push(`data_vencimento = $${idx++}`); values.push(data.data_vencimento) }
-    if (data.status !== undefined) { fields.push(`status = $${idx++}`); values.push(data.status) }
-    if (data.responsavel_id !== undefined) { fields.push(`responsavel_id = $${idx++}`); values.push(data.responsavel_id) }
+    if (Object.keys(updateData).length === 0) return this.findById(id)
 
-    if (fields.length === 0) return this.findById(id)
-
-    values.push(id)
-    return queryOne<DeadlineRow>(
-      `UPDATE deadlines SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
-      values
-    )
+    const { data: result } = await supabaseAdmin
+      .from('deadlines')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single()
+    return (result || null) as DeadlineRow | null
   }
 
   async delete(id: string): Promise<boolean> {
-    const result = await queryOne<{ id: string }>('DELETE FROM deadlines WHERE id = $1 RETURNING id', [id])
-    return result !== null
+    const { data } = await supabaseAdmin
+      .from('deadlines')
+      .delete()
+      .eq('id', id)
+      .select('id')
+      .single()
+    return data !== null
   }
 
   async findTopUrgent(limit: number = 5): Promise<DeadlineRow[]> {
-    return query<DeadlineRow>(
-      `SELECT d.id, d.process_id, d.descricao, d.data_vencimento, d.status, d.responsavel_id,
-              p.numero AS processo_numero, c.nome AS cliente_nome,
-              CASE
-                WHEN d.data_vencimento < CURRENT_DATE     THEN 'vencido'
-                WHEN d.data_vencimento = CURRENT_DATE     THEN 'vence_hoje'
-                WHEN d.data_vencimento <= CURRENT_DATE+3  THEN 'critico'
-                WHEN d.data_vencimento <= CURRENT_DATE+7  THEN 'urgente'
-                WHEN d.data_vencimento <= CURRENT_DATE+30 THEN 'proximo'
-                ELSE 'normal'
-              END AS urgencia,
-              (d.data_vencimento - CURRENT_DATE) AS dias_restantes
-       FROM deadlines d
-       JOIN processes p ON d.process_id = p.id
-       JOIN clients c ON p.client_id = c.id
-       WHERE d.status != 'concluido'
-       ORDER BY d.data_vencimento ASC
-       LIMIT $1`,
-      [limit]
-    )
+    const { data } = await supabaseAdmin
+      .from('deadlines')
+      .select('*, processes(numero, clients(nome))')
+      .neq('status', 'concluido')
+      .order('data_vencimento', { ascending: true })
+      .limit(limit)
+
+    return (data || []).map((d: any) => {
+      const { urgencia, dias_restantes } = calcUrgency(d.data_vencimento)
+      return {
+        ...d,
+        processo_numero: d.processes?.numero || null,
+        cliente_nome: d.processes?.clients?.nome || null,
+        urgencia,
+        dias_restantes,
+      }
+    }) as DeadlineRow[]
   }
 }

@@ -1,4 +1,4 @@
-import { query, queryOne, queryCount } from '../../config/database'
+import { supabaseAdmin } from '../../config/supabase'
 
 export interface FinancialRow {
   id: string
@@ -20,92 +20,109 @@ export interface FinancialSummary {
 
 export class FinancialRepository {
   async findAll(params: { tipo?: string; client_id?: string; page: number; limit: number }): Promise<{ data: FinancialRow[]; total: number }> {
-    const offset = (params.page - 1) * params.limit
-    const conditions: string[] = []
-    const values: any[] = []
-    let idx = 1
+    let q = supabaseAdmin.from('financial_transactions').select('*, clients(nome)', { count: 'exact' })
 
-    if (params.tipo) {
-      conditions.push(`f.tipo = $${idx++}`)
-      values.push(params.tipo)
-    }
-    if (params.client_id) {
-      conditions.push(`f.client_id = $${idx++}`)
-      values.push(params.client_id)
-    }
+    if (params.tipo) q = q.eq('tipo', params.tipo)
+    if (params.client_id) q = q.eq('client_id', params.client_id)
 
-    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+    const from = (params.page - 1) * params.limit
+    const to = from + params.limit - 1
 
-    const total = await queryCount(`SELECT COUNT(*) FROM financial_transactions f ${where}`, values)
+    const { data, count } = await q
+      .order('data', { ascending: false, nullsFirst: true })
+      .order('id', { ascending: false })
+      .range(from, to)
 
-    const data = await query<FinancialRow>(
-      `SELECT f.*, c.nome AS cliente_nome
-       FROM financial_transactions f
-       LEFT JOIN clients c ON f.client_id = c.id
-       ${where}
-       ORDER BY f.data DESC NULLS LAST, f.id DESC
-       LIMIT $${idx} OFFSET $${idx + 1}`,
-      [...values, params.limit, offset]
-    )
+    const mapped = (data || []).map((f: any) => ({
+      ...f,
+      cliente_nome: f.clients?.nome || null,
+    }))
 
-    return { data, total }
+    return { data: mapped as FinancialRow[], total: count || 0 }
   }
 
   async findById(id: string): Promise<FinancialRow | null> {
-    return queryOne<FinancialRow>(
-      `SELECT f.*, c.nome AS cliente_nome
-       FROM financial_transactions f
-       LEFT JOIN clients c ON f.client_id = c.id
-       WHERE f.id = $1`,
-      [id]
-    )
+    const { data } = await supabaseAdmin
+      .from('financial_transactions')
+      .select('*, clients(nome)')
+      .eq('id', id)
+      .single()
+
+    if (!data) return null
+    return {
+      ...data,
+      cliente_nome: (data as any).clients?.nome || null,
+    } as FinancialRow
   }
 
   async getSummary(): Promise<FinancialSummary> {
-    const result = await queryOne<FinancialSummary>(
-      `SELECT
-        COALESCE(SUM(CASE WHEN tipo = 'entrada' THEN valor ELSE 0 END), 0) AS total_entradas,
-        COALESCE(SUM(CASE WHEN tipo = 'saida' THEN valor ELSE 0 END), 0) AS total_saidas,
-        COALESCE(SUM(CASE WHEN tipo = 'entrada' THEN valor ELSE -valor END), 0) AS saldo
-       FROM financial_transactions`
-    )
-    return result || { total_entradas: 0, total_saidas: 0, saldo: 0 }
+    const { data } = await supabaseAdmin
+      .from('financial_transactions')
+      .select('tipo, valor')
+
+    if (!data || data.length === 0) {
+      return { total_entradas: 0, total_saidas: 0, saldo: 0 }
+    }
+
+    let total_entradas = 0
+    let total_saidas = 0
+    for (const row of data) {
+      if (row.tipo === 'entrada') {
+        total_entradas += row.valor || 0
+      } else {
+        total_saidas += row.valor || 0
+      }
+    }
+
+    return { total_entradas, total_saidas, saldo: total_entradas - total_saidas }
   }
 
   async create(data: { tipo: string; descricao?: string; valor: number; categoria?: string; status?: string; data?: string; client_id?: string | null }): Promise<FinancialRow> {
-    const result = await queryOne<FinancialRow>(
-      `INSERT INTO financial_transactions (tipo, descricao, valor, categoria, status, data, client_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING *`,
-      [data.tipo, data.descricao || null, data.valor, data.categoria || null, data.status || null, data.data || null, data.client_id || null]
-    )
-    return result!
+    const { data: result, error } = await supabaseAdmin
+      .from('financial_transactions')
+      .insert({
+        tipo: data.tipo,
+        descricao: data.descricao || null,
+        valor: data.valor,
+        categoria: data.categoria || null,
+        status: data.status || null,
+        data: data.data || null,
+        client_id: data.client_id || null,
+      })
+      .select()
+      .single()
+    if (error || !result) throw error
+    return result as FinancialRow
   }
 
   async update(id: string, data: { tipo?: string; descricao?: string; valor?: number; categoria?: string; status?: string; data?: string; client_id?: string | null }): Promise<FinancialRow | null> {
-    const fields: string[] = []
-    const values: any[] = []
-    let idx = 1
+    const updateData: Record<string, any> = {}
+    if (data.tipo !== undefined) updateData.tipo = data.tipo
+    if (data.descricao !== undefined) updateData.descricao = data.descricao
+    if (data.valor !== undefined) updateData.valor = data.valor
+    if (data.categoria !== undefined) updateData.categoria = data.categoria
+    if (data.status !== undefined) updateData.status = data.status
+    if (data.data !== undefined) updateData.data = data.data
+    if (data.client_id !== undefined) updateData.client_id = data.client_id
 
-    if (data.tipo !== undefined) { fields.push(`tipo = $${idx++}`); values.push(data.tipo) }
-    if (data.descricao !== undefined) { fields.push(`descricao = $${idx++}`); values.push(data.descricao) }
-    if (data.valor !== undefined) { fields.push(`valor = $${idx++}`); values.push(data.valor) }
-    if (data.categoria !== undefined) { fields.push(`categoria = $${idx++}`); values.push(data.categoria) }
-    if (data.status !== undefined) { fields.push(`status = $${idx++}`); values.push(data.status) }
-    if (data.data !== undefined) { fields.push(`data = $${idx++}`); values.push(data.data) }
-    if (data.client_id !== undefined) { fields.push(`client_id = $${idx++}`); values.push(data.client_id) }
+    if (Object.keys(updateData).length === 0) return this.findById(id)
 
-    if (fields.length === 0) return this.findById(id)
-
-    values.push(id)
-    return queryOne<FinancialRow>(
-      `UPDATE financial_transactions SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
-      values
-    )
+    const { data: result } = await supabaseAdmin
+      .from('financial_transactions')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single()
+    return (result || null) as FinancialRow | null
   }
 
   async delete(id: string): Promise<boolean> {
-    const result = await queryOne<{ id: string }>('DELETE FROM financial_transactions WHERE id = $1 RETURNING id', [id])
-    return result !== null
+    const { data } = await supabaseAdmin
+      .from('financial_transactions')
+      .delete()
+      .eq('id', id)
+      .select('id')
+      .single()
+    return data !== null
   }
 }

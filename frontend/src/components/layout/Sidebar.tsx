@@ -12,6 +12,7 @@ import {
   Bell,
   Settings,
   UserCog,
+  Calendar,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUser } from '@/hooks/useUser'
@@ -26,6 +27,7 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard/agenda', label: 'Agenda', icon: Calendar, permission: 'schedule:read' },
   { href: '/dashboard/clientes', label: 'Clientes', icon: Users, permission: 'clients:read' },
   { href: '/dashboard/processos', label: 'Processos', icon: Scale, permission: 'processes:read' },
   { href: '/dashboard/prazos', label: 'Prazos', icon: Clock, permission: 'deadlines:read' },

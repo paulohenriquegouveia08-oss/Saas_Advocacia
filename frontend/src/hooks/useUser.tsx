@@ -15,7 +15,7 @@ export type Permission =
   | 'notifications:read' | 'notifications:update'
   | 'financial:create' | 'financial:read' | 'financial:update' | 'financial:delete'
   | 'settings:read' | 'settings:update'
-
+  | 'schedule:create' | 'schedule:read' | 'schedule:update' | 'schedule:delete'
 interface UserInfo {
   id: string
   nome: string

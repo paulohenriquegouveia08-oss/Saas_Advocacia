@@ -2,7 +2,6 @@ import { UserRepository } from './user.repository'
 import { CreateUserInput, UpdateUserInput } from './user.schema'
 import { supabaseAdmin } from '../../config/supabase'
 import { ApiError } from '../../utils/api-error'
-import { query } from '../../config/database'
 
 export class UserService {
   private repository = new UserRepository()
@@ -29,7 +28,7 @@ export class UserService {
     })
 
     if (signupError) {
-      if (signupError.message.includes('already been registered') || 
+      if (signupError.message.includes('already been registered') ||
           signupError.message.includes('already exists') ||
           signupError.message.includes('Invalid')) {
         throw ApiError.conflict('Email já está em uso. Utilize outro email.')
@@ -48,18 +47,18 @@ export class UserService {
       role: data.role,
     })
 
-    // Vincular automaticamente ao cargo baseado no role
     try {
-      const roleResult = await query<{ id: string }>(
-        'SELECT id FROM roles WHERE nome = $1 LIMIT 1',
-        [data.role]
-      )
-      
-      if (roleResult.length > 0) {
-        await query(
-          'INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-          [signupData.user.id, roleResult[0].id]
-        )
+      const { data: roleResult } = await supabaseAdmin
+        .from('roles')
+        .select('id')
+        .eq('nome', data.role)
+        .limit(1)
+        .single()
+
+      if (roleResult) {
+        await supabaseAdmin
+          .from('user_roles')
+          .insert({ user_id: signupData.user.id, role_id: roleResult.id })
       }
     } catch (err) {
       console.warn('Erro ao vincular usuário ao cargo:', err)
@@ -84,7 +83,6 @@ export class UserService {
       throw ApiError.forbidden('Não é possível desativar o administrador global')
     }
 
-    // Deactivate instead of hard delete
     await this.repository.update(id, { ativo: false })
 
     return { message: 'Usuário desativado com sucesso' }
