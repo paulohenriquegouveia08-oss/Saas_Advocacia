@@ -28,6 +28,7 @@ export interface ScheduleEvent {
   color?: string
   created_at: string
   updated_at: string
+  status: string
 }
 
 export default function AgendaPage() {
