@@ -75,16 +75,25 @@ export class UserService {
     return updated
   }
 
-  async delete(id: string) {
+  async delete(id: string, requesterId?: string) {
     const existing = await this.repository.findById(id)
     if (!existing) throw ApiError.notFound('Usuário não encontrado')
 
-    if (existing.role === 'admin_global') {
-      throw ApiError.forbidden('Não é possível desativar o administrador global')
+    if (id === requesterId) {
+      throw ApiError.forbidden('Você não pode remover o seu próprio usuário enquanto está logado.')
     }
 
+    // Desativa no banco de dados
     await this.repository.update(id, { ativo: false })
+    
+    // Tenta remover completamente do Auth do Supabase para limpar o acesso
+    try {
+      await supabaseAdmin.auth.admin.deleteUser(id)
+      await this.repository.delete(id)
+    } catch (err) {
+      console.warn('Erro ao remover usuário do auth:', err)
+    }
 
-    return { message: 'Usuário desativado com sucesso' }
+    return { message: 'Usuário removido com sucesso' }
   }
 }

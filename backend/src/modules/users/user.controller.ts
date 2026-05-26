@@ -28,7 +28,8 @@ export class UserController {
   }
 
   async delete(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
-    const result = await service.delete(request.params.id)
+    const requesterId = request.user?.id;
+    const result = await service.delete(request.params.id, requesterId)
     return reply.send(result)
   }
 }

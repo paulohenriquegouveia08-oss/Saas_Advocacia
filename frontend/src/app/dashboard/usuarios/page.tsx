@@ -32,7 +32,7 @@ const ROLES: { value: UserRole; label: string; icon: LucideIcon; description: st
 
 export default function UsuariosPage() {
   const queryClient = useQueryClient()
-  const { hasPermission } = useUser()
+  const { hasPermission, user: currentUser } = useUser()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -179,7 +179,7 @@ export default function UsuariosPage() {
                       {user.created_at ? formatDate(user.created_at) : '-'}
                     </td>
                     <td className="px-6 py-3.5 text-right">
-                      {(canUpdate || canDelete) && user.role !== 'admin_global' && (
+                      {(canUpdate || canDelete) && user.id !== currentUser?.id && (
                         <div className="flex items-center justify-end gap-1">
                           {canUpdate && (
                             <button 
