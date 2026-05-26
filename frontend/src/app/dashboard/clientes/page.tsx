@@ -12,8 +12,9 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { Modal, ConfirmModal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-import { Search, Pencil, Trash2 } from 'lucide-react'
+import { Search, Pencil, Trash2, FileText } from 'lucide-react'
 import type { Client, CreateClientData } from '@/types/client'
+import ClientDocuments from '@/components/ClientDocuments'
 
 export default function ClientesPage() {
   const queryClient = useQueryClient()
@@ -22,6 +23,7 @@ export default function ClientesPage() {
   const [editingClient, setEditingClient] = useState<Client | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [formData, setFormData] = useState<CreateClientData>({ nome: '' })
+  const [documentsClientId, setDocumentsClientId] = useState<string | null>(null)
 
   const { data: response, isLoading, isError, refetch } = useQuery({
     queryKey: ['clients', search],
@@ -139,10 +141,13 @@ export default function ClientesPage() {
                     <td className="px-6 py-3.5 text-sm text-zinc-500">{formatDate(client.created_at)}</td>
                     <td className="px-6 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => openEdit(client)} className="p-2 rounded-lg text-zinc-400 hover:bg-[#1A1A1A] hover:text-gold-400 transition-colors">
+                        <button onClick={() => setDocumentsClientId(client.id)} className="p-2 rounded-lg text-zinc-400 hover:bg-[#1A1A1A] hover:text-blue-400 transition-colors" title="Documentos">
+                          <FileText className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => openEdit(client)} className="p-2 rounded-lg text-zinc-400 hover:bg-[#1A1A1A] hover:text-gold-400 transition-colors" title="Editar">
                           <Pencil className="h-4 w-4" />
                         </button>
-                        <button onClick={() => setDeleteId(client.id)} className="p-2 rounded-lg text-zinc-400 hover:bg-red-500/10 hover:text-red-400 transition-colors">
+                        <button onClick={() => setDeleteId(client.id)} className="p-2 rounded-lg text-zinc-400 hover:bg-red-500/10 hover:text-red-400 transition-colors" title="Excluir">
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
@@ -178,6 +183,10 @@ export default function ClientesPage() {
         message="Tem certeza que deseja excluir este cliente? Todos os processos, prazos e transações associados serão removidos."
         isLoading={deleteMutation.isPending}
       />
+      {/* Documents Modal */}
+      <Modal isOpen={!!documentsClientId} onClose={() => setDocumentsClientId(null)} title="Documentos do Cliente">
+        {documentsClientId && <ClientDocuments clientId={documentsClientId} />}
+      </Modal>
     </div>
   )
 }

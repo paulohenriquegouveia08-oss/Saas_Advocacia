@@ -87,10 +87,7 @@ CREATE TABLE IF NOT EXISTS deadlines (
   data_inicio DATE,
   data_vencimento DATE NOT NULL,
   status deadline_status DEFAULT 'pendente',
-  responsavel_id UUID REFERENCES users(id),
-  dias_restantes INT GENERATED ALWAYS AS (
-    EXTRACT(DAY FROM (data_vencimento - CURRENT_DATE))::INT
-  ) STORED
+  responsavel_id UUID REFERENCES users(id)
 );
 
 -- NOTIFICATIONS
