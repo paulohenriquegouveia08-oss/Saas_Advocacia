@@ -1,6 +1,6 @@
 import { getSupabase } from './auth'
 
-const API_URL = '/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/proxy/backend';
 
 class ApiClient {
   private baseUrl: string
